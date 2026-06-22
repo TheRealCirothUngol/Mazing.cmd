@@ -42,7 +42,7 @@
       Iterative Division - 'recursive' division in a FOR loop
       Eller's Algorithm  - simplest and fastest of them all
     Maze Solvers: always find the 1 solution to perfect mazes
-      Don't Solve - only generate and rebuild mazes
+      Solve Off   - only generate and rebuild mazes
       Wall Follow - left or right hand on wall, depth-first
       Dead Filler - remove dead-ends until path is revealed
       Path Finder - flood maze until exit found, retrace path

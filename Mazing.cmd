@@ -360,7 +360,7 @@ SET "crumb=!crumbs:~%p3%,1!"
 SET "player=!players:~%p4%,1!"
 SET "goal=!goals:~%p5%,1!"
 SET "xWall=!wall!"
-IF "!xWall!"=="�" SET "xWall=!xWalls:~%ynm%,1!"
+IF "!xWall!"=="ÿ" SET "xWall=!xWalls:~%ynm%,1!"
 
 REM random maze creation settings
 REM mzSelect=0-4, rsBias=random/stack=0-199, hvBias=horz/vert=0-149, endPos=0=farthest point,1=far point on border,2+=far corner
@@ -478,7 +478,7 @@ CALL :timeSince %startTime%
 
 REM write maze and info to logfile
 IF DEFINED mazeFile (
-	SET "bz=!mz:�=%xWall%!"
+	SET "bz=!mz:ÿ=%xWall%!"
 	FOR /L %%A IN (0,!wide!,!size!) DO IF %%A LSS !size! ECHO(!bz:~%%A,%wide%!>>"!mazeFile!"
 	ECHO(!mm!>>"!mazeFile!"
 	ECHO(created in !TS_! at !TIME: =0! on !DATE!>>"!mazeFile!"
@@ -498,7 +498,7 @@ IF !svSelect! GTR 0 ( SET "startTime=%TIME% %DATE%"
 	CALL :timeSince !startTime!
 	REM write solution and info to logfile
 	IF DEFINED solvFile (
-		SET "mz=!mz:�=%xWall%!"
+		SET "mz=!mz:ÿ=%xWall%!"
 		ECHO(>>"!solvFile!"
 		FOR /L %%A IN (0,!wide!,!size!) DO IF %%A LSS !size! ECHO(!mz:~%%A,%wide%!>>"!solvFile!"
 		ECHO(!mm!>>"!solvFile!"
@@ -796,7 +796,7 @@ SET /A "mode=%~3%%20, nodes=cols*rows, lbClr=cnt=nCnt=pct=hPos=0, cTmp=wide-4"
 SET /A "b1=bgnPos+1, p1=%~1, t1=rows-1, t2=cols-1, vBias=100-%~3, hBias=%~3"
 SET "fill=!hall!"
 IF !mode! EQU 0 SET "fill=!crumb!"
-IF "!wall!" EQU "�" SET "fill=!crumb!"
+IF "!wall!" EQU "ÿ" SET "fill=!crumb!"
 IF %~3 GTR 99 SET /A "vBias=1, hBias=99"
 IF %~3 LSS 1 SET /A "vBias=99, hBias=1"
 IF !bgClr! LSS 7 SET "lbClr=F"
@@ -926,7 +926,7 @@ REM %1=directional bias. 0=most vertical, 99=most horizontal
 SET /A "mode=%~1%%20, curPos=bgnPos, b1=bgnPos+1, b2=bgnPos/(wide*2)+1, lbClr=sCnt=cnt=c1=0, nCnt=trail=far=1, cTmp=wide-4, vBias=100-%~1, hBias=%~1"
 SET "fill=!hall!"
 IF !mode! EQU 0 SET "fill=!crumb!"
-IF "!wall!" EQU "�" SET "fill=!crumb!"
+IF "!wall!" EQU "ÿ" SET "fill=!crumb!"
 IF %~1 GTR 99 SET /A "vBias=1, hBias=99"
 IF %~1 LSS 1 SET /A "vBias=99, hBias=1"
 SET "msg= vrt=!vBias!%%:hrz=!hBias!%%"
@@ -1197,8 +1197,8 @@ IF %~1 LSS 0 (
 	FOR %%A IN (!bgnPos! !stack! !endPos!) DO (
 		SET /A "sp=%%A+wide*2, ep=%%A+2, sw=%%A+wide, ew=%%A+1"
 		FOR /F "tokens=1-4" %%B IN ("!sp! !sw! !ep! !ew!") DO (
-			IF "!mz:~%%B,1!" EQU "!crumb!" IF "!mz:~%%C,1!" NEQ "!wall!" SET "stk=!stk!%%C "
-			IF "!mz:~%%D,1!" EQU "!crumb!" IF "!mz:~%%E,1!" NEQ "!wall!" SET "stk=!stk!%%E "
+			IF "!mz:~%%B,1!" EQU "!crumb!" IF "!mz:~%%C,1!" EQU "!hall!" SET "stk=!stk!%%C "
+			IF "!mz:~%%D,1!" EQU "!crumb!" IF "!mz:~%%E,1!" EQU "!hall!" SET "stk=!stk!%%E "
 		)
 	)
 	FOR %%A IN (!stk!) DO ( SET /A "t1=%%A+1"
@@ -1224,7 +1224,7 @@ SET "fix=!crumb!"
 SET "fill=!hall!"
 IF %~1 LSS 0 SET tf=1
 IF !tf! GTR 0 (
-	IF "!wall!"=="�" SET "wall=�"
+	IF "!wall!"=="ÿ" SET "wall=Û"
 	SET "fix=!hall!"
 	SET "fill=!wall!"
 ) ELSE SET "mz=!mz:%hall%=%crumb%!"
@@ -1303,8 +1303,8 @@ IF %~1 LSS 0 (
 	FOR %%A IN (!bgnPos! !rw0! !rw1! !endPos!) DO (
 		SET /A "sp=%%A+wide*2, ep=%%A+2, sw=%%A+wide, ew=%%A+1"
 		FOR /F "tokens=1-4" %%B IN ("!sp! !sw! !ep! !ew!") DO (
-			IF "!mz:~%%B,1!" EQU "!crumb!" IF "!mz:~%%C,1!" NEQ "!wall!" SET "t0=!t0!%%C "
-			IF "!mz:~%%D,1!" EQU "!crumb!" IF "!mz:~%%E,1!" NEQ "!wall!" SET "t0=!t0!%%E "
+			IF "!mz:~%%B,1!" EQU "!crumb!" IF "!mz:~%%C,1!" EQU "!hall!" SET "t0=!t0!%%C "
+			IF "!mz:~%%D,1!" EQU "!crumb!" IF "!mz:~%%E,1!" EQU "!hall!" SET "t0=!t0!%%E "
 		)
 	)
 	FOR %%A IN (!t0!) DO ( SET /A "t1=%%A+1"
@@ -1332,7 +1332,7 @@ SET "mz=!mazeTop!!mz:~%wide%,-%wide%!!mazeBtm!"
 SET "bz=!mz!"
 SET "fill=!crumb!"
 IF %~1 LSS 0 SET "fill=!wall!"
-IF "!wall!"=="�" SET "fill=�"
+IF "!wall!"=="ÿ" SET "fill=²"
 
 REM set display
 IF !display! NEQ 0 ( !clear!
@@ -1535,11 +1535,11 @@ SET "mazeFile=%~n0.mazes.nfo"   'file to save created mazes, no file if undefine
 SET "solvFile=%~n0.mazes.nfo"   'file to save solved mazes, no file if undefined
 REM default character strings for random generation
 REM these seem safe for non-legacy Win10 console
-SET "walls=##%%%%&&0889BDGMQQWYZ@@��������������������"
+SET "walls=##%%%%&&0889BDGMQQWYZ@@¬¬««²²ÛÛáãäèéï÷ÿÿ"
 SET "halls= "                      'space is the only hall character that seems to work well
-SET "crumbs=���������o"            'chosen for being small and centered
-SET "players=ꎏS"             'chosen because they look like a player or entrance
-SET "goals=F$X��"               'chosen because they look like an exit or goal
+SET "crumbs=°°±±øúúþþo"            'chosen for being small and centered
+SET "players=êS"             'chosen because they look like a player or entrance
+SET "goals=F$X¨û"               'chosen because they look like an exit or goal
 SET "backColors=078F"            'color list of hex numbers for random background selection
 SET "foreColors=1234569ABCDE"    'color list of hex numbers for random foreground selection
 ::::::::::::::::::::::::
@@ -1561,7 +1561,7 @@ SET "delay=0"                       'delay in centiseconds to slow process for v
 SET "title0=Mazing Menu"            'string showing current operation in TITLE
 SET "title1='%quitKey%' Quit/Menu"  'notice displayed at the end of TITLE
 SET "hex=0123456789ABCDEF"          'hexadecimal table for COLOR command
-SET "xWalls=#@�"                    'walls used to display '�' (invisible wall)
+SET "xWalls=#@Û"                    'walls used to display 'ÿ' (invisible wall)
 SET "mazingDebug=REM "              'clear or comment this to output SET.txt for each function
 SET "BGgrabKey=REM "                'used in place of BGgrabKey if inactive
 
@@ -1579,10 +1579,10 @@ IF EXIST "%iniFile%" ( FOR /F "skip=2 tokens=1* delims=:=" %%A IN ('FIND /V ";" 
 	FOR %%A IN (maxCols minCols maxRows minRows maxSize minSize menuKeys quitKey maxLoop useGrabKey flashTime shiftFrequency grabKeyFrequency mazeFile solvFile walls halls crumbs players goals backColors foreColors) DO ECHO(%%A=!%%A!
 	ECHO.
 	ECHO ; many of the characters below will not work in Win10 without 'properties/legacy console' mode enabled
-	ECHO ;walls="##%%%%&&0889BDGMQQWYZ@@��������������������"
-	ECHO ;crumbs="���������o"
-	ECHO ;players="ꎏS"
-	ECHO ;goals="?$X��"
+	ECHO ;walls="##%%%%&&0889BDGMQQWYZ@@¬¬««²²ÛÛáãäèéï÷ÿÿ"
+	ECHO ;crumbs="°°±±øúúþþo"
+	ECHO ;players="êS"
+	ECHO ;goals="?$X¨û"
 	ECHO ;numOfBoxes=12
 	ECHO.
 	ECHO ; uncomment the following line to throw out debug.txt for all functions
@@ -1614,17 +1614,17 @@ REM       1
 REM  "box?=123456789ABCDEF" no zero, because all walls are connected
 SET "box0=|||-\/+-/\+-+++"
 SET "box1=|||-\/+-/\+-+++"
-SET "box2=��������ٿ�����"
-SET "box3=�������ͼ������"
-SET "box4=�������Ľ������"
-SET "box5=�������;������"
-SET "box6=���������������"
-SET "box7=���������������"
-SET "box8=���������������"
-SET "box9=�����������"
-SET "box10=�����������"
+SET "box2=³³³ÄÀÚÃÄÙ¿´ÄÁÂÅ"
+SET "box3=ºººÍÈÉÌÍ¼»¹ÍÊËÎ"
+SET "box4=ºººÄÓÖÇÄ½·¶ÄÐÒ×"
+SET "box5=³³³ÍÔÕÆÍ¾¸µÍÏÑØ"
+SET "box6=ÞÝÛÜßÜÛßßÜÛÛÛÛÛ"
+SET "box7=ÝÞÛßßÜÛÜßÜÛÛÛÛÛ"
+SET "box8=ßÜÛÞÛÛÛÝÛÛÛÛÛÛÛ"
+SET "box9=²²²²²²²²²²²"
+SET "box10=ÛÛÛÛÛÛÛÛÛÛÛ"
 REM last 2 boxes will not work in Win10 without 'legacy console' mode enabled
-SET "box11=����!chars:~20,1!ٿ�����"
+SET "box11=³ÀÚÃ!chars:~20,1!Ù¿´ÄÁÂÅ"
 SET "box12=|\/+!chars:~20,1!/\+-+++"
 
 REM box characters for menu
@@ -1632,13 +1632,13 @@ REM @=3 {=6 [=5 }=9 ]=A $=C
 REM  "mBox?=012345"
 SET "mBox_=@{[}]$"
 SET "mBox0=|\//\-"
-SET "mBox1=���ٿ�"
-SET "mBox2=��ɼ��"
-SET "mBox3=��ֽ��"
-SET "mBox4=��վ��"
-SET "mBox5=������"
-SET "mBox6=������"
-SET "mBox7=������"
+SET "mBox1=³ÀÚÙ¿Ä"
+SET "mBox2=ºÈÉ¼»Í"
+SET "mBox3=ºÓÖ½·Ä"
+SET "mBox4=³ÔÕ¾¸Í"
+SET "mBox5=ÛßÜßÜÛ"
+SET "mBox6=ÛÛÛÛÛÛ"
+SET "mBox7=²²²²²²"
 
 REM main menu, %version%=3 chars, @ { } [ ] $ are reserved
 SET "mrk=>> " 'menu selection marker
@@ -2065,4 +2065,4 @@ E = Light Yellow
 F = Bright White
 
 :: these characters must remain the last line of the script - DO NOT REMOVE!
-"#$%&'()+,-./0123456789:;<>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~����������������������������������������������������������������������������������
+"#$%&'()+,-./0123456789:;<>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~ ¡¢£¤¥¦§¨«¬­®¯°±²Ûàáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ

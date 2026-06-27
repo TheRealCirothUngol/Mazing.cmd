@@ -367,7 +367,7 @@ REM mzSelect=0-4, rsBias=random/stack=0-199, hvBias=horz/vert=0-149, endPos=0=fa
 SET /A "cols=!RANDOM!%%(maxCols-minCols+1)+minCols, rows=!RANDOM!%%(maxRows-minRows+1)+minRows"
 SET /A "mzSelect=!RANDOM!%%10,svSelect=!RANDOM!%%10+1,rsBias=!RANDOM!%%200,hvBias=!RANDOM!%%300"
 SET /A "hk1=!RANDOM!%%3,gt1=!RANDOM!%%36-12,id1=!RANDOM!%%16,id2=!RANDOM!%%16"
-SET /A "rebuild=!RANDOM!%%(numOfBoxes+3)-2,solve=!RANDOM!%%6-2,pfSolve=!RANDOM!%%79-39"
+SET /A "rebuild=!RANDOM!%%(numOfBoxes+3)-2,solve=!RANDOM!%%7-3,pfWorms=!RANDOM!%%25+1"
 IF !hvBias! GEQ 250 ( SET /A hvBias-=225%=        '1 in 6  set hvBias=25 to 75 mid-range =%
 ) ELSE IF !hvBias! GEQ 200 ( SET /A hvBias-=175%= '1 in 6  set hvBias=25 to 75 mid-range =%
 ) ELSE IF !hvBias! GEQ 150 ( SET /A hvBias-=125%= '1 in 6  set hvBias=25 to 75 mid-range =%
@@ -489,7 +489,7 @@ REM solve maze
 IF !svSelect! GTR 0 ( SET "startTime=%TIME% %DATE%"
 	IF !svSelect! EQU 1 CALL :mazing_wall_follow !solve!
 	IF !svSelect! EQU 2 CALL :mazing_dead_filler !solve!
-	IF !svSelect! GEQ 3 CALL :mazing_path_finder !pfSolve!
+	IF !svSelect! GEQ 3 CALL :mazing_path_finder !solve! !pfWorms!
 	IF ERRORLEVEL 3 GOTO :mazing_stop
 	IF ERRORLEVEL 2 GOTO :mazing_restart
 	IF !display! NEQ 0 ( !clear!
@@ -1319,7 +1319,8 @@ EXIT /B 0
 
 :mazing_path_finder fillType
 REM %1=fill maze with what? %1<0=walls, %1>=0=crumbs
-REM    If %1 is odd, worms show the current stack. larger absolute value = longer worms.
+REM    If %1 is odd, worms show the current stack.
+REM %2=length of worms, if there are any. limit is ~25
 SET /A "nodes=cols*rows, lbClr=chk=cnt=wormCnt=0, trail=nCnt=1, cTmp=wide-4, mode=%~1 %% 2"
 SET "title0=Path Finder"
 SET "r1= Path Finder "
@@ -1333,9 +1334,6 @@ SET "bz=!mz!"
 SET "fill=!crumb!"
 IF %~1 LSS 0 SET "fill=!wall!"
 IF "!wall!"=="ÿ" SET "fill=²"
-IF !mode! NEQ 0 SET mode=%~1
-IF !mode! LSS 0 SET/A mode*=-1
-IF !mode! NEQ 0 SET/A mode=mode/2+1
 
 REM set display
 IF !display! NEQ 0 ( !clear!
@@ -1381,12 +1379,12 @@ FOR /L %%? IN (1,1,64) DO IF NOT DEFINED pf%endPos% FOR /L %%@ IN (1,1,64) DO IF
 		%EKO%!msg:~1!
 	)
 	IF !mode! NEQ 0 ( SET/A wormCnt+=1
-		IF !wormCnt! GTR !mode! FOR /F "tokens=1* delims=;" %%A IN ("!crmStk1!") DO ( SET "crmStk1=%%B"
+		IF !wormCnt! GTR %~2 FOR /F "tokens=1* delims=;" %%A IN ("!crmStk1!") DO ( SET "crmStk1=%%B"
 			FOR %%C IN (%%A) DO FOR /F "tokens=1-2 delims=:" %%D IN ("%%C") DO (
 				SET "mz=!mz:~0,%%D!!hall!!mz:~%%E!"))
 		SET "crmStk1=!crmStk1!!newStk1!;"
 		IF !display! GTR 0 (
-			IF !wormCnt! GTR !mode! FOR /F "tokens=1* delims=;" %%A IN ("!crmStk2!") DO ( SET "crmStk2=%%B"
+			IF !wormCnt! GTR %~2 FOR /F "tokens=1* delims=;" %%A IN ("!crmStk2!") DO ( SET "crmStk2=%%B"
 				FOR %%C IN (%%A) DO FOR /F "tokens=1-2 delims=:" %%D IN ("%%C") DO (
 					BG.EXE FCPrint %%D %%E !bgClr!!exClr! "!hall!"))
 			SET "crmStk2=!crmStk2!!newStk2!;"

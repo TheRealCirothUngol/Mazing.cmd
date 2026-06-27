@@ -367,7 +367,7 @@ REM mzSelect=0-4, rsBias=random/stack=0-199, hvBias=horz/vert=0-149, endPos=0=fa
 SET /A "cols=!RANDOM!%%(maxCols-minCols+1)+minCols, rows=!RANDOM!%%(maxRows-minRows+1)+minRows"
 SET /A "mzSelect=!RANDOM!%%10,svSelect=!RANDOM!%%10+1,rsBias=!RANDOM!%%200,hvBias=!RANDOM!%%300"
 SET /A "hk1=!RANDOM!%%3,gt1=!RANDOM!%%36-12,id1=!RANDOM!%%16,id2=!RANDOM!%%16"
-SET /A "rebuild=!RANDOM!%%(numOfBoxes+3)-2,solve=!RANDOM!%%7-3,pfWorms=!RANDOM!%%25+1"
+SET /A "rebuild=!RANDOM!%%(numOfBoxes+3)-2,solve=!RANDOM!%%7-3,pfWorms=!RANDOM!%%40+1"
 IF !hvBias! GEQ 250 ( SET /A hvBias-=225%=        '1 in 6  set hvBias=25 to 75 mid-range =%
 ) ELSE IF !hvBias! GEQ 200 ( SET /A hvBias-=175%= '1 in 6  set hvBias=25 to 75 mid-range =%
 ) ELSE IF !hvBias! GEQ 150 ( SET /A hvBias-=125%= '1 in 6  set hvBias=25 to 75 mid-range =%
@@ -1320,7 +1320,7 @@ EXIT /B 0
 :mazing_path_finder fillType
 REM %1=fill maze with what? %1<0=walls, %1>=0=crumbs
 REM    If %1 is odd, worms show the current stack.
-REM %2=length of worms, if there are any. limit is ~25
+REM %2=length of worms, if there are any. limit is ~40
 SET /A "nodes=cols*rows, lbClr=chk=cnt=wormCnt=0, trail=nCnt=1, cTmp=wide-4, mode=%~1 %% 2"
 SET "title0=Path Finder"
 SET "r1= Path Finder "
@@ -1339,14 +1339,13 @@ REM set display
 IF !display! NEQ 0 ( !clear!
 	ECHO(!mz!
 	%EKO%!msg:~1!
-)
+) ELSE SET mode=0
 IF !display! GTR 0 CALL :mazing_BGcolor
 
 SET "pf%bgnPos%=-1"
 SET "stack=!bgnPos! "
 FOR /L %%? IN (1,1,64) DO IF NOT DEFINED pf%endPos% FOR /L %%@ IN (1,1,64) DO IF NOT DEFINED pf%endPos% (
-	SET "newStk1="
-	SET "newStk2="
+	SET "newStk="
 	SET /A trail+=1
 	FOR %%A IN (!stack!) DO ( SET "stack=!stack:* =!"
 		%BGgrabKey%
@@ -1363,12 +1362,11 @@ FOR /L %%? IN (1,1,64) DO IF NOT DEFINED pf%endPos% FOR /L %%@ IN (1,1,64) DO IF
 				IF %%E NEQ !endPos! SET "mz=!mz:~0,%%E!!fill!!mz:~%%F!"
 				SET "stack=!stack!%%E "
 				SET "pf%%E=%%C %%D %%A !ew!"
-				SET "newStk1=!newStk1!%%C:%%D %%E:%%F "
+				SET "newStk=!newStk!%%C %%E "
 				IF !display! GTR 0 (
 					SET /A "r1=%%C/wide, c1=%%C-r1*wide, r2=%%E/wide, c2=%%E-r2*wide"
 					BG.EXE FCPrint !r1! !c1! !bgClr!!exClr! "!fill!"
 					IF %%E NEQ !endPos! BG.EXE FCPrint !r2! !c2! !bgClr!!exClr! "!fill!"
-					SET "newStk2=!newStk2!!r1!:!c1! !r2!:!c2! "
 				)
 			)
 		)
@@ -1379,17 +1377,15 @@ FOR /L %%? IN (1,1,64) DO IF NOT DEFINED pf%endPos% FOR /L %%@ IN (1,1,64) DO IF
 		%EKO%!msg:~1!
 	)
 	IF !mode! NEQ 0 ( SET/A wormCnt+=1
-		IF !wormCnt! GTR %~2 FOR /F "tokens=1* delims=;" %%A IN ("!crmStk1!") DO ( SET "crmStk1=%%B"
-			FOR %%C IN (%%A) DO FOR /F "tokens=1-2 delims=:" %%D IN ("%%C") DO (
-				SET "mz=!mz:~0,%%D!!hall!!mz:~%%E!"))
-		SET "crmStk1=!crmStk1!!newStk1!;"
-		IF !display! GTR 0 (
-			IF !wormCnt! GTR %~2 FOR /F "tokens=1* delims=;" %%A IN ("!crmStk2!") DO ( SET "crmStk2=%%B"
-				FOR %%C IN (%%A) DO FOR /F "tokens=1-2 delims=:" %%D IN ("%%C") DO (
-					BG.EXE FCPrint %%D %%E !bgClr!!exClr! "!hall!"))
-			SET "crmStk2=!crmStk2!!newStk2!;"
+		IF !wormCnt! GTR %~2 FOR /F "tokens=1* delims=;" %%A IN ("!crmStk!") DO ( SET "crmStk=%%B"
+			FOR %%C IN (%%A) DO ( SET/A t1=%%C+1
+				FOR %%D IN (!t1!) DO SET "mz=!mz:~0,%%C!!hall!!mz:~%%D!"
+				IF !display! GTR 0 ( SET/A "r1=%%C/wide,c1=%%C-r1*wide
+					BG.EXE FCPrint !r1! !c1! !bgClr!!exClr! "!hall!"
+				)
+			)
 		)
-		
+		SET "crmStk=!crmStk!!newStk:~0,-1!;"
 	)
 )
 IF NOT DEFINED pf%endPos% CALL :mazing_failure PathFinder

@@ -524,6 +524,7 @@ IF !display! NEQ 0 IF !flashTime! NEQ 0 ( !clear!
 	COLOR 47
 	ECHO(!mz!
 	%EKO%!mm:~1!
+	SET gkTrg=0
 	FOR %%A IN (4 5 1 0) DO FOR %%B IN (%%A7 %%AF %%A7 %%A8) DO (
 		COLOR %%B
 		%BGgrabKey%
@@ -1018,6 +1019,7 @@ EXIT /B 0
 :mazing_rebuild boxType
 REM %1=type of maze produced. %1<0=random single character, %1>0=box characters 1-12
 SET /A "wd=cols*2,bx=%~1%%(%numOfBoxes%+1),t1=!RANDOM!%%bColorCnt,t2=!RANDOM!%%fColorCnt,t3=!RANDOM!%%wallCnt,t4=!RANDOM!%%crumbCnt,b1=bgnPos+1,e1=endPos+1"
+IF !t1!==!t2! GOTO :mazing_rebuild
 IF %mzOp13% EQU 16 IF %t1% LEQ 7 (IF %t2% LEQ 7 SET/A t2+=8)ELSE IF %t2% GEQ 8 SET/A t2-=8
 IF %mzOp13% LSS 0  SET "bgClr=!bColors:~%t1%,1!"
 IF %mzOp13% GTR 15 SET "bgClr=!bColors:~%t1%,1!"
@@ -1099,7 +1101,7 @@ EXIT /B 0
 
 :mazing_wall_follow fillType
 REM %1=write what to maze? %1<0=walls, %1>=0=halls
-SET /A "curPos=bgnPos, nodes=cols*rows, lbClr=c1=0, nCnt=nTmp=cnt=trail=1, cTmp=wide-4, wTmp=!RANDOM!%%2, mTmp=!RANDOM!%%4+1"
+SET /A "curPos=bgnPos, nodes=cols*rows, lbClr=c1=0, nCnt=nTmp=cnt=trail=1, cTmp=wide-4, wTmp=!RANDOM!%%2, mTmp=!RANDOM!%%4+1, p1=!RANDOM!%%wallCnt"
 IF !wTmp! EQU 0 ( REM pick random starting hand
 	SET "hand=Left"
 	SET "listN=s e n w"
@@ -1127,7 +1129,17 @@ SET "mazeBtm=!r1:~0,%wide%!"
 SET "mz=!mz:~0,-%wide%!!mazeBtm!"
 SET "bz=!mz!"
 SET "fill=!hall!"
-IF %~1 LSS 0 SET "fill=!wall!"
+SET "tCrumb=!crumb!"
+IF "!wall!"=="ÿ" SET "wall=!walls:~%p1%,1!"
+IF "!wall!"=="ÿ" SET "wall=!xWall!"
+IF %~1 LSS 0 ( SET "fill=!wall!"
+	IF !yn! EQU 0 IF !rebuild! GEQ 6 IF !rebuild! LEQ 9 SET "fill=Û"
+	IF !yn! NEQ 0 IF !rebuild! EQU 10 SET "fill=²"
+)
+IF !ynm! GTR 0 IF !rebuild! GTR 0 ( SET "tCrumb=!wall!"
+	SET "t1=!box%rebuild%!"
+	FOR /L %%A IN (0,1,15) DO IF "!t1:~%%A,1!" EQU "!tCrumb!" SET "tCrumb=!crumb!"
+)
 
 REM set display
 IF !display! NEQ 0 ( !clear!
@@ -1147,7 +1159,7 @@ FOR /L %%? IN (1,1,64) DO IF !curPos! NEQ !endPos! FOR /L %%@ IN (1,1,64) DO IF 
 	SET /A "cnt+=1, cTmp=curPos+1, np=curPos-wide*2, sp=curPos+wide*2, ep=curPos+2, wp=curPos-2, wChk=curPos/wide*wide, eChk=wChk+wide, nw=curPos-wide, sw=curPos+wide, ew=curPos+1, ww=curPos-1"
 	FOR %%A IN (!list!) DO FOR /F "tokens=1,2" %%B IN ("!%%Aw! !%%Ap!") DO (
 		SET "wTmp=!mz:~%%B,1!"
-		IF "!wTmp!" EQU "!crumb!" SET "wTmp=!hall!"
+		IF "!wTmp!" EQU "!tCrumb!" SET "wTmp=!hall!"
 		IF "!wTmp!" EQU "!hall!" IF %%C GTR !wide! IF %%C LSS !size! (
 			SET "cw=%%B"
 			SET "newPos=%%C"
@@ -1156,7 +1168,7 @@ FOR /L %%? IN (1,1,64) DO IF !curPos! NEQ !endPos! FOR /L %%@ IN (1,1,64) DO IF 
 		)
 	)
 	SET /A wTmp=cw+1, nTmp=newPos+1
-	IF "!char!" EQU "!crumb!" ( SET /A trail-=1
+	IF "!char!" EQU "!tCrumb!" ( SET /A trail-=1
 		SET "stack=!stack:* =!"
 		FOR /F "tokens=1-4" %%A IN ("!curPos! !cTmp! !cw! !wTmp!") DO (
 			SET "mz=!mz:~0,%%A!!fill!!mz:~%%B!"
@@ -1170,11 +1182,11 @@ FOR /L %%? IN (1,1,64) DO IF !curPos! NEQ !endPos! FOR /L %%@ IN (1,1,64) DO IF 
 		SET "stack=!newPos! !stack!"
 		SET /A "nCnt+=1, pct=nCnt*100/nodes, trail+=1"
 		FOR /F "tokens=1-4" %%A IN ("!cw! !wTmp! !newPos! !nTmp!") DO (
-			SET "mz=!mz:~0,%%A!!crumb!!mz:~%%B!"
-			SET "mz=!mz:~0,%%C!!crumb!!mz:~%%D!"
+			SET "mz=!mz:~0,%%A!!tCrumb!!mz:~%%B!"
+			SET "mz=!mz:~0,%%C!!tCrumb!!mz:~%%D!"
 			IF !display! GTR 0 ( SET /A "r1=%%A/wide, c1=%%A-r1*wide, r2=%%C/wide, c2=%%C-r2*wide"
-				BG.EXE FCPrint !r1! !c1! !bgClr!!exClr! "!crumb!"
-				BG.EXE FCPrint !r2! !c2! !bgClr!!exClr! "!crumb!"
+				BG.EXE FCPrint !r1! !c1! !bgClr!!exClr! "!tCrumb!"
+				BG.EXE FCPrint !r2! !c2! !bgClr!!exClr! "!tCrumb!"
 			)
 		)
 	)
@@ -1188,23 +1200,22 @@ FOR /L %%? IN (1,1,64) DO IF !curPos! NEQ !endPos! FOR /L %%@ IN (1,1,64) DO IF 
 	)
 )
 IF !curPos! NEQ !endPos! CALL :mazing_failure WallFollow
+REM write maze with crumb trail
 SET /A "b1=bgnPos+1, e1=endPos+1"
-IF %~1 LSS 0 (
-	SET "mz=!bz!"
-	FOR %%A IN (!bgnPos! !stack! !endPos!) DO ( SET /A "t1=%%A+1"
-		FOR %%B IN (!t1!) DO SET "mz=!mz:~0,%%A!!crumb!!mz:~%%B!
+SET "mz=!bz!"
+FOR %%A IN (!bgnPos! !stack! !endPos!) DO ( SET /A "t1=%%A+1"
+	FOR %%B IN (!t1!) DO SET "mz=!mz:~0,%%A!!crumb!!mz:~%%B!
+)
+FOR %%A IN (!bgnPos! !stack! !endPos!) DO (
+	SET /A "sp=%%A+wide*2, ep=%%A+2, sw=%%A+wide, ew=%%A+1"
+	FOR /F "tokens=1-4" %%B IN ("!sp! !sw! !ep! !ew!") DO (
+		IF "!mz:~%%B,1!" EQU "!crumb!" IF "!mz:~%%C,1!" EQU "!hall!" SET "stk=!stk!%%C "
+		IF "!mz:~%%D,1!" EQU "!crumb!" IF "!mz:~%%E,1!" EQU "!hall!" SET "stk=!stk!%%E "
 	)
-	FOR %%A IN (!bgnPos! !stack! !endPos!) DO (
-		SET /A "sp=%%A+wide*2, ep=%%A+2, sw=%%A+wide, ew=%%A+1"
-		FOR /F "tokens=1-4" %%B IN ("!sp! !sw! !ep! !ew!") DO (
-			IF "!mz:~%%B,1!" EQU "!crumb!" IF "!mz:~%%C,1!" EQU "!hall!" SET "stk=!stk!%%C "
-			IF "!mz:~%%D,1!" EQU "!crumb!" IF "!mz:~%%E,1!" EQU "!hall!" SET "stk=!stk!%%E "
-		)
-	)
-	FOR %%A IN (!stk!) DO ( SET /A "t1=%%A+1"
-		FOR %%B IN (!t1!) DO (
-			SET "mz=!mz:~0,%%A!!crumb!!mz:~%%B!"
-		)
+)
+FOR %%A IN (!stk!) DO ( SET /A "t1=%%A+1"
+	FOR %%B IN (!t1!) DO (
+		SET "mz=!mz:~0,%%A!!crumb!!mz:~%%B!"
 	)
 )
 SET "mz=!mz:~0,%bgnPos%!!player!!mz:~%b1%!"
@@ -1536,7 +1547,7 @@ REM default character strings for random generation
 REM these seem safe for non-legacy Win10 console
 SET "walls=##%%%%&&0889BDGMQQWYZ@@¬¬««²²ÛÛáãäèéï÷ÿÿ"
 SET "halls= "                      'space is the only hall character that seems to work well
-SET "crumbs=°°±±øúúþþo"            'chosen for being small and centered
+SET "crumbs=°°±±øúúþþx"            'chosen for being small and centered
 SET "players=êŽS"             'chosen because they look like a player or entrance
 SET "goals=F$X¨û"               'chosen because they look like an exit or goal
 SET "backColors=078F"            'color list of hex numbers for random background selection
@@ -1579,7 +1590,7 @@ IF EXIST "%iniFile%" ( FOR /F "skip=2 tokens=1* delims=:=" %%A IN ('FIND /V ";" 
 	ECHO.
 	ECHO ; many of the characters below will not work in Win10 without 'properties/legacy console' mode enabled
 	ECHO ;walls="##%%%%&&0889BDGMQQWYZ@@¬¬««²²ÛÛáãäèéï÷ÿÿ"
-	ECHO ;crumbs="°°±±øúúþþo"
+	ECHO ;crumbs="°°±±øúúþþx"
 	ECHO ;players="êŽS"
 	ECHO ;goals="?$X¨û"
 	ECHO ;numOfBoxes=12
@@ -1620,8 +1631,8 @@ SET "box5=³³³ÍÔÕÆÍ¾¸µÍÏÑØ"
 SET "box6=ÞÝÛÜßÜÛßßÜÛÛÛÛÛ"
 SET "box7=ÝÞÛßßÜÛÜßÜÛÛÛÛÛ"
 SET "box8=ßÜÛÞÛÛÛÝÛÛÛÛÛÛÛ"
-SET "box9=²²²²²²²²²²²"
-SET "box10=ÛÛÛÛÛÛÛÛÛÛÛ"
+SET "box9=ÛÛÛÛÛÛÛÛÛÛÛ"
+SET "box10=²²²²²²²²²²²"
 REM last 2 boxes will not work in Win10 without 'legacy console' mode enabled
 SET "box11=³ÀÚÃ!chars:~20,1!Ù¿´ÄÁÂÅ"
 SET "box12=|\/+!chars:~20,1!/\+-+++"
@@ -1747,7 +1758,7 @@ REM set macros
 SET "POZ=FOR %%# IN (1 2)DO IF %%#==2 (PAUSE>NUL&ECHO.)ELSE <NUL SET/P="
 SET colorShift=IF ^^^!csCnt^^^! LSS ^^^!csTrg^^^! (SET/A csCnt+=1%\n%
 )ELSE (SET/A pCnt+=1,csCnt=0%\n%
-	FOR /F "tokens=1-4 delims=:." %%W IN ("^!TIME: =0^!")DO (%\n%
+	FOR /F "tokens=1-4 delims=:.," %%W IN ("^!TIME: =0^!")DO (%\n%
 		SET/A "BGtime=FGtime=(((1%%W*60)+1%%X)*60+1%%Y)*100+1%%Z-36610100,clrF=BGtime-csLast,bgr=^!RANDOM^!%%bColorCnt,fgr=^!RANDOM^!%%fColorCnt"%\n%
 		IF ^^^!clrF^^^! GTR ^^^!shiftFrequency^^^! (SET/A csTrg-=1) ELSE SET/A csTrg+=1%\n%
 		IF ^^^!csBtm^^^! GTR 0 (IF NOT DEFINED BGstart SET/A BGstart=BGend=BGtime,BGend+=csBtm%\n%
@@ -1790,7 +1801,7 @@ IF !bgKey! GEQ 65 IF !bgKey! LEQ 90   SET /A t1=bgKey+32
 IF !bgKey! GEQ 97 IF !bgKey! LEQ 122  SET /A t1=bgKey-32
 SET BGgrabKey=IF ^^^!gkCnt^^^! LSS ^^^!gkTrg^^^! (SET/A gkCnt+=1%\n%
 )ELSE (SET gkCnt=0%\n%
-	FOR /F "tokens=1-4 delims=:." %%W IN ("^!TIME: =0^!")DO SET/A "GKtime=(((1%%W*60)+1%%X)*60+1%%Y)*100+1%%Z-36610100,gtkF=GKtime-gkLast"%\n%
+	FOR /F "tokens=1-4 delims=:.," %%W IN ("^!TIME: =0^!")DO SET/A "GKtime=(((1%%W*60)+1%%X)*60+1%%Y)*100+1%%Z-36610100,gtkF=GKtime-gkLast"%\n%
 	IF ^^^!gtkF^^^! GTR ^^^!grabKeyFrequency^^^! (SET/A gkTrg-=1) ELSE SET/A gkTrg+=1%\n%
 	SET gkLast=^^^!GKtime^^^!%\n%
 	BG.EXE LastKbd%\n%
@@ -1852,9 +1863,9 @@ FOR /F "tokens=3-12" %%A IN ('Expand') DO (
 	ENDLOCAL & EXIT /B 0) >NUL 2>&1
 
 -----BEGIN CERTIFICATE-----
-TVNDRgAAAACeEQAAAAAAACwAAAAAAAAAAwEBAAIAAABpBwAAYgAAAAEAAxUAJgAA
-AAAAAAAAN025dSAAYmcuZXhlAE0EAAAAJgAAAADVXNidIABNYXppbmcuYmFrLmlu
-aQArQ8dkNBFNKluAgI0CINikbdQAtlMAJCIAYAAA+g9Juj11o2DISqZ/ARapI5WU
+TVNDRgAAAACgEQAAAAAAACwAAAAAAAAAAwEBAAIAAABpBwAAYgAAAAEAAxUAJgAA
+AAAAAAAAN025dSAAYmcuZXhlAE0EAAAAJgAAAADcXPSUIABNYXppbmcuYmFrLmlu
+aQBoZVyVNhFNKluAgI0CINikbdQAtlMAJCIAYAAA+g9Juj11o2DISqZ/ARapI5WU
 SqOy3DM0zlSLwnfVDTdbd/qvKWW6nXGcNsweMow9UJ6zdzvwj8O0nfAOP8v7MLfP
 kM899k3kM+RMjXyGSQ64qADAzAwdjQDAQxn99zqOigziAMpKatKJz0kDxSfHcnW0
 3CfVSNbatpG30ozYtkshKeaCanfuBmEJobZgt8iFr4JjKVqFTBWprKxa0ZY2QtuE
@@ -1935,17 +1946,17 @@ I30XuUG7Z2dmliEWXPJnqwPsP/wtbRV3/I/tD2yY9jmX4medjMyWLA0vbv0eYcbE
 RQJbTF4JfiXd4mhmO0dKA+0JFEwMEOzWUfvPYswMLEyTfCUbxIJBfDxMtZJJF7ms
 5MiI3bq8Nv40o9LxQilUYpFQH41yzmGlLkNjvxM89abfeVlf6bZh+oLlmaFEND3H
 8Gl6l4kE1++cKxlnrl1kj7Fk2tlNLet2j3P2s+yMWPAvXNNNMGBHHdhRHXbIl8PK
-fMTkvsThdU8MkOb+w1yUu4aJfMOBDxcVHRc0HYrn0YDoIsUoXC+WrS/nyc0sa2VG
-P9z9EF5pYbgQI0QO7lw31EsL/jCSSZ7SUNrv/xX6O/aKDWbH2rMIGgpu2CiFkgFv
-JpaOGJSkqEJFQE7ChAto9NyFuTuHRFHDhwBd9P92sufRcQKUSJRYnIrA8DJpn0Lj
-RCHy1bsporprxPNz+q3/97C+imTy/UlX28RdBRpTVKmOq1pZyKTscu3Ol8cUaYVX
-Y9S06/RibNt2NXeEj7JC07qoTtpZzpXsdxDU3FTBO5XR7m3iEz+ESdL23rUgY6WF
-uji2f6ZxyBWJwj2ilMiDMSlOZ/pvk3pP92nOfYnGZnVu1R5uGmlzRygPQLXKL+tv
-k5wGZCi5vPqcpuFR5ARSOB8WbSsNb4O0tl1D3qPYZnKXqHImkoGvx4pMnAawT6xb
-a1a+VYsrrl1QL6898S99vJB/5GD9R2rqsTQs2byssp/cZ7Tbmtp8bbGlrak2HJtb
-m1st3DfuDAprOcuNuZcU3eYQUplXd5xS2cXc2Yiqau9Rkj0M3l0X72We9vH99PZ7
-3N78y/MFc9y5RnezGtjQCude953+V597bv31g9/970MdMOwXcGAfXYNJv/fvs52w
-Fzb+307XhaAyC5edoWbJbz7thlJoWb+c22u8fPLH/XZnxmbmmLvcrGRcdW9wHA==
+fMTkvsThdU8MkOb+w1yUu4aJfMOBDxcVHRf2HDyCBlQXiUZBeils5Tm3bn5ZSzNi
+4S6H+Errw/UYCXKA5yKhdlq4h1lM8pSW0vb/h9B/sa9s2DtWnjXQ0HBDRlGUxHgr
+sQzEMCR1FaICQhIuXHCjJy5E3eEkyho+BIiiP7frPf+Ok6CMohTiRATGl1H7hBpP
+ChGvJk2R1d0jFp9bb52/1/X9JIPvV7qSJk4q2JjqStVcpcpyJtWXQ3dmPG5Iu7yi
+oy5dHxej26arYSO0lL2afkUV0tZydmTPg6jmvgqmqaR23xOP+GlMmrYnrpUZ8y0E
+xSn9042zrjAURhFNRO6MoXEa00+bPHt6T9PuuzR2q0urNnBzSPM70nmYqkV+AX9T
+5Fwgm8k11Uc05Y/iJwjCIbCQW/l4a6Rt7RrytsUekxtENTO5DJQ9lmR6NFB94t2C
+s2KtWlzx7Vp6ce2Bf3njjfzrB4M/IlPvpVHJjmVl/eQ+k93m1KZr0y3lTY3haNyy
+3Nrh3nFvULjLYW5cvVzozoegyjS6k5S6LubOzlTle0eSVGGI7up49/O8jy+nt9/r
+9rZf5i/g4541mpvNwL5W0PeC7zy/utzz6/8fdO6vH/qAeb/oA2Pogkz6vR+f/YR9
+sOn/vrr2BHVZKOyUNbt+C2lPlPLLMuVEXvvl2z/mt5Mz7jM/3DVmxePieyPjqACA
 -----END CERTIFICATE-----
 
 BG v3.9 se (unicode)

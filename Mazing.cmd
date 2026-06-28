@@ -1332,8 +1332,10 @@ SET "mazeBtm=!r1:~0,%wide%!"
 SET "mz=!mazeTop!!mz:~%wide%,-%wide%!!mazeBtm!"
 SET "bz=!mz!"
 SET "fill=!crumb!"
-IF %~1 LSS 0 SET "fill=!wall!"
-IF "!wall!"=="ÿ" SET "fill=²"
+SET "plug=!hall!"
+IF %~1 LSS 0 ( SET "fill=!wall!"
+) ELSE IF !rebuild! LSS 0 SET "plug=!wall!"
+IF "!fill!"=="ÿ" SET "fill=²"
 
 REM set display
 IF !display! NEQ 0 ( !clear!
@@ -1379,9 +1381,9 @@ FOR /L %%? IN (1,1,64) DO IF NOT DEFINED pf%endPos% FOR /L %%@ IN (1,1,64) DO IF
 	IF !mode! NEQ 0 ( SET/A wormCnt+=1
 		IF !wormCnt! GTR %~2 FOR /F "tokens=1* delims=;" %%A IN ("!crmStk!") DO ( SET "crmStk=%%B"
 			FOR %%C IN (%%A) DO ( SET/A t1=%%C+1
-				FOR %%D IN (!t1!) DO SET "mz=!mz:~0,%%C!!hall!!mz:~%%D!"
+				FOR %%D IN (!t1!) DO SET "mz=!mz:~0,%%C!!plug!!mz:~%%D!"
 				IF !display! GTR 0 ( SET/A "r1=%%C/wide,c1=%%C-r1*wide
-					BG.EXE FCPrint !r1! !c1! !bgClr!!exClr! "!hall!"
+					BG.EXE FCPrint !r1! !c1! !bgClr!!exClr! "!plug!"
 				)
 			)
 		)

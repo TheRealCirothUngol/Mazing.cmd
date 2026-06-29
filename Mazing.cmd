@@ -96,7 +96,7 @@
 ::  If using Windows 10+ enable 'properties/legacy console'
 :: 
 :: 
-:: project by CirothUngol                  v0.2 June 26, 2026
+:: project by CirothUngol                  v0.2 June 28, 2026
 ::
 :: There were a host of display issues using the new Win10 terminal.
 :: Nearly all of them were fixed by enabling 'legacy console'.

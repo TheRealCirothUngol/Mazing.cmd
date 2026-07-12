@@ -33,7 +33,7 @@
     the menu are accessed by command line or the .ini file.
     A list of available user variables may be found in the
     Mazing.ini file that is auto-generated on first run.
-::
+    
                            Menu Options
     __________________________________________________________
     Maze Generators: BackTracker - random depth-first search
@@ -67,7 +67,7 @@
     Rebuild Box:      Rebuild Off - continue with current maze
         Random Box  - replace walls with 1 of 12 pre-set boxes
         Random Wall - replace wall character from random list
-::
+    
                            Menu Options
     __________________________________________________________
     Solver Display Settings: value to affect visual display

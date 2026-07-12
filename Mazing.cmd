@@ -5,10 +5,10 @@
 :: includes several maze generation and solving algorithms as
 :: well as a small plethora of options for console display,
 :: stack size, stack orientation, node selection/direction
-:: bias, entrance/exit points, color selection, real-time
-:: shifting and rhythmic pulsing random colors, and wall/box
-:: characters, each with an automatic randomizer, and all of
-:: it easily accessible through an animated custom menu.
+:: bias, entrance/exit points, color selection, wall/box
+:: characters, and real-time shifting and rhythmic pulsing
+:: random colors, each with an automatic randomizer, and all
+:: of it easily accessible through an animated custom menu.
 :: Mazes are limited to a maximum practical string length of
 :: 8186 characters. The maze dimensions will be automatically
 :: increased/decreased if minimum/maximum size is exceeded.
@@ -17,6 +17,7 @@
 :: use either BG.EXE or CursorPos.exe to place the cursor at
 :: the upper-left if they are located in the system path. It
 :: can also use BG.EXE to animate the screen in full color.
+:: 
 :: 
 ::               Command Line / Mazing.ini File
 :: __________________________________________________________
@@ -34,31 +35,32 @@
 ::
 ::                        Menu Options
 :: __________________________________________________________
-:: Maze Generators: perfect mazes, one path to any two points
-::   BackTracker  - created by random depth-first search
-::   Hunt & Kill  - like BackTracker, but more random
-::   Growing Tree - certainly the most versatile generator
-::   Iterative Division - 'recursive' division in a FOR loop
-::   Eller's Algorithm  - simplest and fastest of them all
+:: Maze Generators: BackTracker - random depth-first search
+::   Hunt & Kill  - like BackTracker, but with random stack
+::   Growing Tree - highly versatile list-based generator
+::   Wall Division - recursively divide rooms with walls
+::   Eller's Algorithm - elegant, and the fastest generator
+::   Prim's Algorithm  - hard ugly mazes with short dead ends
+::   Kruskal's Algorithm - creates even measured mazes, slow
+::   Wilson's Algorithm  - classic loop-erased random walk
 :: Maze Solvers: always find the 1 solution to perfect mazes
-::   Solve Off   - only generate and rebuild mazes
 ::   Wall Follow - left or right hand on wall, depth-first
 ::   Dead Filler - remove dead-ends until path is revealed
 ::   Path Finder - flood maze until exit found, retrace path
 :: Entrance/Exit: where to place the maze entrance and exit
-::   Inside - entrance=any random point, exit=farthest point
-::   Border - entrance=point on border, exit=farthest border
-::   Corner - entrance=random corner, exit=farthest corner
+::   Inside - entrance=any random point  exit=farthest point
+::   Border - entrance=point on border  exit=farthest border
+::   Corner - entrance=random corner    exit=farthest corner
 :: Width: # of vertical columns, limited by minCols/maxCols
 :: Height: # of horizontal rows, limited by minRows/maxRows
 :: Ancillary Setting: different for each maze generator
-::   Hunt & Kill  - type of stack, 0=FIFO, <>0=LIFO
+::   Hunt & Kill  - type of stack, <0=FIFO, else LIFO
 ::   Growing Tree - list size, 0=all+LIFO, <0=FIFO, >0=LIFO
 ::   Division - wall open, 0=NW,1=SE,2=NW/SE,3=Mid,4+=Random
 :: Node Selection Bias: % chance of choosing random or stack
 ::   Hunt & Kill   - 0=random from stack,100=next from stack
-::   Growing Tree  - 0=random from list, 100=next from stack
-::   Itr. Division - stack order, 0-7=pre-sets, 8+=random
+::   Growing Tree  - 0=random from list, 100=next from list
+::   Wall Division - stack order, 0-7=pre-sets, 8+=random
 :: Node Direction Bias: % chance of choosing each direction
 ::   0=most vertical, 50=even chance, 100=most horizontal
 :: Rebuild Box:      Rebuild Off - continue with current maze
@@ -67,6 +69,7 @@
 ::
 ::                        Menu Options
 :: __________________________________________________________
+:: Solver Display Settings: value to affect visual display
 :: Wall Character:  wall used for initial maze generation
 :: Crumb Character: trail used for initial maze generation
 ::   These two may be altered by Rebuild if it's active
@@ -96,8 +99,17 @@
 ::  If using Windows 10+ enable 'properties/legacy console'
 :: 
 :: 
-:: project by CirothUngol                  v0.2 June 28, 2026
+:: project by CirothUngol                  v0.3 July 11, 2026
 ::
+:: Added Prim's, Kruskal's, and Wilson's Algorithms as generators.
+:: Added menu option for solvers with lots of new display stuff.
+:: Improved and unified the title bar layout. Lots of small
+:: cosmetic changes throughout. Mazing now contains all of the
+:: notable algorithms to produce perfect mazes as well as the only
+:: three suitable solvers I know of. v0.3 is it, I think I'm done?
+:: If there's ever a v0.4 it'll be for ANSI console integration.
+:: 
+::                                         v0.2 June 21, 2026
 :: There were a host of display issues using the new Win10 terminal.
 :: Nearly all of them were fixed by enabling 'legacy console'.
 :: Fixed the Win10 poison characters by removing from character lists.
@@ -135,15 +147,6 @@ IF /I "%key%" NEQ "%~2" GOTO :mazing_grabKey
 DEL /F /Q /A %3 >NUL 2>&1
 EXIT /B 0
 
-:mazing_wait centiseconds
-REM high CPU load, only suitable for very short delays
-FOR /F "tokens=1-4 delims=:." %%W IN ("%TIME: =0%") DO SET/A "waitTime=(((1%%W*60)+1%%X)*60+1%%Y)*100+1%%Z-36610100"
-IF NOT DEFINED waitStart SET/A waitStart=waitEnd=waitTime,waitEnd+=%~1-1
-IF %waitTime% LSS %waitStart% SET /A waitTime+=8640000
-IF %waitTime% LSS %waitEnd% GOTO :mazing_wait
-SET waitStart=
-EXIT /B 0
-
 :mazing_menu
 REM replace random box characters and set color for 1st run
 IF DEFINED fstClr SET/A bgClr=0,fgClr=!RANDOM!%%7+1
@@ -154,12 +157,13 @@ FOR /L %%y IN (0,1,5) DO FOR %%z IN ("!mBox_:~%%y,1!=!mBox%bx%:~%%y,1!") DO SET 
 FOR /L %%y IN (0,1,%opCnt%) DO FOR %%z IN (":%%y:=!mView%%y!") DO SET "tMenu=!tMenu:%%~z!"
 REM replace menu keys, insert maze characters and other text
 FOR %%# IN (":A:=%menuKeys:~0,2%" ":B:=%menuKeys:~2,2%" ":C:=%menuKeys:~4,3%" ":D:=%menuKeys:~7,1%") DO SET "tMenu=!tMenu:%%~#!"
-SET "tMenu=!tMenu:~0,906!!wall!!tMenu:~907!"
-SET "tMenu=!tMenu:~0,966!!crumb!!tMenu:~967!"
-SET "tMenu=!tMenu:~0,1026!!player!!tMenu:~1027!"
-SET "tMenu=!tMenu:~0,1086!!goal!!tMenu:~1087!"
+SET "tMenu=!tMenu:~0,966!!wall!!tMenu:~967!"
+SET "tMenu=!tMenu:~0,1026!!crumb!!tMenu:~1027!"
+SET "tMenu=!tMenu:~0,1086!!player!!tMenu:~1087!"
+SET "tMenu=!tMenu:~0,1146!!goal!!tMenu:~1147!"
 SET "tMenu=!tMenu:~0,%mzOp5P1%!!mzOp5[%mzOp0%]!!tMenu:~%mzOp5P2%!"
 SET "tMenu=!tMenu:~0,%mzOp6P1%!!mzOp6[%mzOp0%]!!tMenu:~%mzOp6P2%!"
+SET "tMenu=!tMenu:~0,%mzOp9P1%!!mzOp9[%mzOp1%]!!tMenu:~%mzOp9P2%!"
 IF !mzOp8! GEQ 1 IF !mzOp8! LEQ !numOfBoxes! SET "tMenu=!tMenu:~0,%mzOp8P1%!!box%mzOp8%!!tMenu:~%mzOp8P2%!"
 SET "tMenu=!tMenu:~0,%msgP1%!!mMsg%mCh%!!tMenu:~%msgP2%!"
 REM copy color settings, change mode, start menu
@@ -169,7 +173,7 @@ IF DEFINED skipMenu (SET skipMenu=) & (SET mOp=5) & GOTO :mazing_menu_exit
 MODE CON COLS=%mWide% LINES=%mHigh%
 
 :mazing_menu_display
-TITLE Maze#!mazeCnt!: !title0! at %TIME: =0%
+TITLE Maze#!mazeCnt! ^| !title0! %TIME: =0%
 SET /A mrkPos=mPos-3
 COLOR !mbClr!!mfClr!
 !clear!
@@ -200,7 +204,9 @@ IF !mCh! EQU 0 (SET "tMenu=!tMenu:~0,%mzOp5P1%!!mzOp5[%mt0%]!!tMenu:~%mzOp5P2%!"
 				SET "mMsg5=!mMsg5[%mt0%]!"
 				SET "mMsg6=!mMsg6[%mt0%]!"
 				SET "mt1=!mzOp0[%mt0%]!")
-IF !mCh! EQU 1  SET "mt1=!mzOp1[%mt0%]!"
+IF !mCh! EQU 1  (SET "tMenu=!tMenu:~0,%mzOp9P1%!!mzOp9[%mt0%]!!tMenu:~%mzOp9P2%!"
+				SET "mMsg9=!mMsg9[%mt0%]!"
+				SET "mt1=!mzOp1[%mt0%]!")
 IF !mCh! EQU 2  SET "mt1=!mzOp2[%mt0%]!" 'display string instead of number
 IF !mCh! EQU 3  IF !mt0! EQU 0 (SET /A mt1=mzOp3=minCols
 				) ELSE IF !mt0! LSS !minCols! SET /A mt1=mzOp3=-1 & SET mt1=Random
@@ -214,16 +220,17 @@ IF !mCh! EQU 8 (SET "tMenu=!tMenu:~0,%mzOp8P1%!               !tMenu:~%mzOp8P2%!
 				) ELSE IF !mzOp8! EQU %nobRW% (SET mt1=Random Wall
 				) ELSE IF !mzOp8! GTR 0  (SET mt1=Box#!mt0!
 					SET "tMenu=!tMenu:~0,%mzOp8P1%!!box%mzOp8%!!tMenu:~%mzOp8P2%!"))
-IF !mCh! GEQ 9 IF !mCh! LEQ 12 IF !mt0! GEQ 0 SET mt1=!chars:~%mt0%,1!
-IF !mCh! EQU 13 (SET bColors=!backColors!& SET bColorCnt=!backColorCnt!
+IF !mCh! EQU 9  IF !mt0! GEQ 0 SET /A mt1=mt0-30
+IF !mCh! GEQ 10 IF !mCh! LEQ 13 IF !mt0! GEQ 0 SET mt1=!chars:~%mt0%,1!
+IF !mCh! EQU 14 (SET bColors=!backColors!& SET bColorCnt=!backColorCnt!
 				IF !mt0! LSS 0 (SET mbClr=!bgClr!
 				) ELSE IF !mt0! LEQ 15 (SET mt1=!hex:~%mt0%,1!& SET mbClr=!mt1!
 				) ELSE SET mbClr=!bgClr!& SET mt1=Very Random& SET bColors=!hex!& SET bColorCnt=16)
-IF !mCh! EQU 14 (SET fColors=!foreColors!& SET fColorCnt=!foreColorCnt!
+IF !mCh! EQU 15 (SET fColors=!foreColors!& SET fColorCnt=!foreColorCnt!
 				IF !mt0! LSS 0 (SET mfClr=!fgClr!
 				) ELSE IF !mt0! LEQ 15 (SET mt1=!hex:~%mt0%,1!& SET mfClr=!mt1!
 				) ELSE SET mfClr=!fgClr!& SET mt1=Very Random& SET fColors=!hex!& SET fColorCnt=16)
-IF !mCh! GEQ 15 IF !mCh! LEQ 16 (
+IF !mCh! GEQ 16 IF !mCh! LEQ 17 (
 				IF !mCh! EQU !lastCh! (IF !mOp! EQU !lastOp! (SET/A mCnt+=1) ELSE SET mCnt=1) ELSE SET mCnt=1
 				IF !mCnt! GEQ 20 IF !mOp! EQU 2 (SET/A mt0-=9)  ELSE SET/A mt0+=9
 				IF !mCnt! GEQ 40 IF !mOp! EQU 2 (SET/A mt0-=20) ELSE SET/A mt0+=20
@@ -234,23 +241,22 @@ IF !mCh! GEQ 15 IF !mCh! LEQ 16 (
 				IF !mt0! GTR 0 SET mt1=0.0!mt0! sec
 				IF !mt0! GTR 9 SET mt1=0.!mt0! sec
 				IF !mt0! GTR 99 SET mt1=!mt0:~0,-2!.!mt0:~-2! sec
-				IF !mCh! EQU 15 (SET/A csBtm=mzOp15=mt0) ELSE SET/A csFtm=mzOp16=mt0)
-IF !mCh! EQU 17 (IF !mt0! LSS 0 SET pulse=!RANDOM!%%20+6
+				IF !mCh! EQU 16 (SET/A mzOp16=mt0) ELSE SET/A mzOp17=mt0)
+IF !mCh! EQU 18 (IF !mt0! LSS 0 SET pulse=!RANDOM!%%20+6
 				IF !mt0! EQU 0 SET "mt1=Pulse Off"
-				IF !mt0! GEQ 0 SET/A mt3=mt0*shiftFrequency,pulse=mt0
+				IF !mt0! GEQ 0 SET/A mt3=mt0*shiftFrequency
 				IF !mt3! GTR 0 SET mt1=0.0!mt3! sec
 				IF !mt3! GTR 9 SET mt1=0.!mt3! sec
 				IF !mt3! GTR 99 SET mt1=!mt3:~0,-2!.!mt3:~-2! sec)
-IF !mCh! EQU 18 (IF !mt0! LSS 0 SET /A mt0=mzOp18=maxOp18-1
-				IF !mt0! EQU !maxOp18! SET /A mt0=mzOp18=0
+IF !mCh! EQU 19 (IF !mt0! LSS 0 SET /A mt0=mzOp19=maxOp19-1
+				IF !mt0! EQU !maxOp19! SET /A mt0=mzOp19=0
 				IF !mt0! EQU 0 SET mt1=Delay Off
 				IF !mt0! GTR 0 SET mt1=0.0!mt0! sec
 				IF !mt0! GTR 9 SET mt1=0.!mt0! sec
-				IF !mt0! GTR 99 SET mt1=!mt0:~0,-2!.!mt0:~-2! sec
-				SET delay=!mt0!)
-IF !mCh! EQU 19 (SET display=!mzOp19!& SET mt1=Display Off
-				IF !mzOp19! LSS 0 SET mt1=16 Color
-				IF !mzOp19! GTR 0 SET mt1=BG Color)
+				IF !mt0! GTR 99 SET mt1=!mt0:~0,-2!.!mt0:~-2! sec)
+IF !mCh! EQU 20 (SET mt1=Display Off
+				IF !mzOp20! LSS 0 SET mt1=16 Color
+				IF !mzOp20! GTR 0 SET mt1=BG Color)
 SET lastCh=!mCh!
 SET lastOp=!mOp!
 SET "mt1=!mt1!             "
@@ -264,18 +270,43 @@ GOTO :mazing_menu_display
 REM 4=continue&resume, 5=quit&restart, 6=abort&exit, 7=display help
 IF !mOp! EQU 7 FOR /F "usebackq tokens=* delims=:" %%# IN ("%~f0") DO (
 	IF "%%#"=="" (SET/A mt0+=1
-		TITLE %~n0 Help: page !mt0! of !pages! at !TIME: =0!
+		TITLE %~n0 Help ^| page# !mt0! of !pages! !TIME: =0!
 		ECHO(
 		%POZ% page !mt0! of !pages!, press any key to continue...
 		ECHO(
 		ECHO(
 		IF !mt0! EQU !pages! (SET/A mh1=mSize-mWide*2-1
 			FOR /L %%: IN (0,!mWide!,!mh1!) DO (ECHO(!tMenu:~%%:,%mt1%!
-				CALL :mazing_wait 3)
+				CALL :mazing_wait 4)
 			GOTO :mazing_menu_display)
 	) ELSE (ECHO(%%#
-		CALL :mazing_wait 3)
+		CALL :mazing_wait 4)
 )
+%mazingDebug% SET>%~f0.debug.menu.txt
+SET "tMenu="
+
+REM save menu configuration and check for exit
+>"!cfgFile!" ECHO REM %~nx0 v%version% runs as batch file at end of :mazing_init
+>>"!cfgFile!" ECHO SET saveCh=!mCh!
+FOR /L %%A IN (0,1,%opCnt%) DO >>"!cfgFile!" ECHO SET mzOp%%A=!mzOp%%A!
+
+REM check for new settings
+SET "BGstart=" & SET "FGstart=" & SET /A csCnt=pCnt=0
+SET bgClr=!mbClr!& SET fgClr=!mfClr!& SET fstClr=
+IF !mzOp1!  GEQ 0 SET "svSelect=!mzOp1!"
+IF !mzOp8!  GEQ 0 SET "rebuild=!mzOp8!"
+IF !mzOp9!  GEQ 0 SET /A "solve=mzOp9-30"
+IF !mzOp14! GEQ 0 IF !mzOp14! LEQ 15 SET "bgClr=!hex:~%mzOp14%,1!"
+IF !mzOp15! GEQ 0 IF !mzOp15! LEQ 15 SET "fgClr=!hex:~%mzOp15%,1!"
+IF !mzOp16! GEQ 0 SET "csBtm=!mzOp16!"
+IF !mzOp17! GEQ 0 SET "csFtm=!mzOp17!"
+IF !mzOp18! GEQ 0 SET "pulse=!mzOp18!"
+IF !mzOp19! GEQ 0 SET "delay=!mzOp19!"
+                  SET "display=!mzOp20!"
+
+REM if colorShift is unnecessary disable it by setting the target too high
+IF !csBtm!!csFtm!!pulse! EQU 0 (SET csTrg=2147483647& SET "titleCS=") ELSE (SET csTrg=0& SET "titleCS=cs:^!csTrg^!")
+
 REM generate BG.EXE if needed
 IF !display! GTR 0 ( BG.EXE >NUL 2>&1
 	IF !ERRORLEVEL!==9009 (
@@ -285,22 +316,14 @@ IF !display! GTR 0 ( BG.EXE >NUL 2>&1
 		IF !mOp! NEQ 6 SET /A BG_restart=mOp=6
 	)
 )
-%mazingDebug% SET>%~f0.debug.menu.txt
-SET "tMenu="
-
-REM save menu configuration and check for exit
->"!cfgFile!" ECHO REM %~nx0 v%version% runs as batch file at end of :mazing_init
->>"!cfgFile!" ECHO SET saveCh=!mCh!
-FOR /L %%A IN (0,1,%opCnt%) DO >>"!cfgFile!" ECHO SET mzOp%%A=!mzOp%%A!
 IF !mOp! EQU 6 EXIT /B 3%=   'check for script abort =%
 
-REM start KeyGrabber, collect colors, and check for exit
-IF !csBtm!!csFtm!!pulse! EQU 0 (SET csTrg=2147483647& SET "titleCS=") ELSE (SET csTrg=0& SET "titleCS=cs:^!csTrg^!")
-SET "BGstart=" & SET "FGstart=" & SET "csCnt=0"
-SET bgClr=!mbClr!& SET fgClr=!mfClr!& SET fstClr=
+REM start KeyGrabber, check for exit
 REM.>"%keyFile%"
-IF NOT DEFINED bgKey START "" /B CMD /C ^""%~f0" grabKey "!quitKey!" "!keyFile!" 2^>NUL ^>NUL^"
+IF NOT DEFINED bgKey (
+	START "" /B CMD /C ^""%~f0" grabKey "!quitKey!" "!keyFile!" 2^>NUL ^>NUL^" )
 IF !mOp! EQU 5 EXIT /B 2
+IF !display! EQU 0 (SET csTrg=2147483647& SET "titleCS=")
 IF !display! EQU 0 EXIT /B 0
 IF NOT DEFINED wide EXIT /B 0
 
@@ -363,11 +386,11 @@ SET "xWall=!wall!"
 IF "!xWall!"=="ÿ" SET "xWall=!xWalls:~%ynm%,1!"
 
 REM random maze creation settings
-REM mzSelect=0-4, rsBias=random/stack=0-199, hvBias=horz/vert=0-149, endPos=0=farthest point,1=far point on border,2+=far corner
+REM mzSelect=0-7, rsBias=random/stack=0-199, hvBias=horz/vert=0-149, endPos=0=farthest point,1=far point on border,2+=far corner
 SET /A "cols=!RANDOM!%%(maxCols-minCols+1)+minCols, rows=!RANDOM!%%(maxRows-minRows+1)+minRows"
-SET /A "mzSelect=!RANDOM!%%10,svSelect=!RANDOM!%%10+1,rsBias=!RANDOM!%%200,hvBias=!RANDOM!%%300"
-SET /A "hk1=!RANDOM!%%3,gt1=!RANDOM!%%36-12,id1=!RANDOM!%%16,id2=!RANDOM!%%16"
-SET /A "rebuild=!RANDOM!%%(numOfBoxes+3)-2,solve=!RANDOM!%%7-3,pfWorms=!RANDOM!%%40+1"
+SET /A "mzSelect=!RANDOM!%%14,svSelect=!RANDOM!%%10+1,rsBias=!RANDOM!%%200,hvBias=!RANDOM!%%300"
+SET /A "hk1=!RANDOM!%%6-3,gt1=wa1=!RANDOM!%%36-12,id1=!RANDOM!%%16,id2=!RANDOM!%%16"
+SET /A "rebuild=!RANDOM!%%(numOfBoxes+3)-2,solve=!RANDOM!%%61-30"
 IF !hvBias! GEQ 250 ( SET /A hvBias-=225%=        '1 in 6  set hvBias=25 to 75 mid-range =%
 ) ELSE IF !hvBias! GEQ 200 ( SET /A hvBias-=175%= '1 in 6  set hvBias=25 to 75 mid-range =%
 ) ELSE IF !hvBias! GEQ 150 ( SET /A hvBias-=125%= '1 in 6  set hvBias=25 to 75 mid-range =%
@@ -376,9 +399,10 @@ IF !rsBias! GEQ 175 ( SET /A rsBias=101%=         '1 in 8  set stack to alternat
 ) ELSE IF !rsBias! GEQ 150 ( SET /A rsBias=0%=    '1 in 8  set stack always random =%
 ) ELSE IF !rsBias! GEQ 100 SET /A rsBias-=75%=    '1 in 4  set rsBias=25 to 75 mid-range =%
 IF !gt1! GTR 12 SET "gt1=0"%=                     '1 in 3  set to list=all =%
-IF !id1! EQU  0 SET "mzSelect=0"%=                '1 in 16 set to BackTracker =%
+IF !gt1! LSS -6 SET "gt1*=-1"%=                   '1 in 2  set greater half of FIFO=LIFO =%
+IF !id2! EQU  0 SET "solve=0"%=                   '1 in 16 set solvers to neutral (PathFinder=Flood)
 IF !gt1:~-1! EQU 1 SET /A gt1+=1%=                'assure gtList NEQ 1 =%
-REM if Itr Division, push 50% high-ends towards the middle
+REM if Wall Division, push 50% high-ends towards the middle
 REM then set 20% high-ends = 50 for more even maze displays
 SET idBias=!hvBias!
 IF !idBias! LEQ 25 (SET/A idBias+=25) ELSE IF !idBias! GEQ 75 SET/A idBias-=25
@@ -388,24 +412,26 @@ REM check for user/menu settings
 IF NOT EXIST "%keyFile%" CALL :mazing_menu
 IF ERRORLEVEL 3 GOTO :mazing_stop
 IF !mzOp0!  GEQ 0 SET "mzSelect=!mzOp0!"
+IF !mzSelect! EQU 7 (IF !hvBias! LEQ 25 (SET/A hvBias+=25) ELSE IF !hvBias! GEQ 75 SET/A hvBias-=25)
 IF !mzOp1!  GEQ 0 SET "svSelect=!mzOp1!"
 IF !mzOp3!  GEQ 0 SET "cols=!mzOp3!"
 IF !mzOp4!  GEQ 0 SET "rows=!mzOp4!"
-IF !mzOp5!  GEQ 0 SET /A "hk1=gt1=id1=mzOp5-12"
+IF !mzOp5!  GEQ 0 SET /A "hk1=gt1=id1=wa1=mzOp5-12"
 IF !mzOp6!  GEQ 0 SET /A "rsBias=id2=!mzOp6!"
 IF !mzOp7!  GEQ 0 SET /A "hvBias=idBias=!mzOp7!"
 IF !mzOp8!  GEQ 0 SET "rebuild=!mzOp8!"
-IF !mzOp9!  GEQ 0 SET "wall=!chars:~%mzOp9%,1!"
-IF !mzOp10! GEQ 0 SET "crumb=!chars:~%mzOp10%,1!"
-IF !mzOp11! GEQ 0 SET "player=!chars:~%mzOp11%,1!"
-IF !mzOp12! GEQ 0 SET "goal=!chars:~%mzOp12%,1!"
-IF !mzOp13! GEQ 0 IF !mzOp13! LEQ 15 SET "bgClr=!hex:~%mzOp13%,1!"
-IF !mzOp14! GEQ 0 IF !mzOp14! LEQ 15 SET "fgClr=!hex:~%mzOp14%,1!"
-IF !mzOp15! GEQ 0 SET "csBtm=!mzOp15!"
-IF !mzOp16! GEQ 0 SET "csFtm=!mzOp16!"
-IF !mzOp17! GEQ 0 SET "pulse=!mzOp17!"
-IF !mzOp18! GEQ 0 SET "delay=!mzOp18!"
-SET /A display=mzOp19,mt0=-2
+IF !mzOp9!  GEQ 0 SET /A "solve=mzOp9-30"
+IF !mzOp10! GEQ 0 SET "wall=!chars:~%mzOp10%,1!"
+IF !mzOp11! GEQ 0 SET "crumb=!chars:~%mzOp11%,1!"
+IF !mzOp12! GEQ 0 SET "player=!chars:~%mzOp12%,1!"
+IF !mzOp13! GEQ 0 SET "goal=!chars:~%mzOp13%,1!"
+IF !mzOp14! GEQ 0 IF !mzOp14! LEQ 15 SET "bgClr=!hex:~%mzOp14%,1!"
+IF !mzOp15! GEQ 0 IF !mzOp15! LEQ 15 SET "fgClr=!hex:~%mzOp15%,1!"
+IF !mzOp16! GEQ 0 SET "csBtm=!mzOp16!"
+IF !mzOp17! GEQ 0 SET "csFtm=!mzOp17!"
+IF !mzOp18! GEQ 0 SET "pulse=!mzOp18!"
+IF !mzOp19! GEQ 0 SET "delay=!mzOp19!"
+SET /A display=mzOp20,mt0=-2
 IF !id1! LSS 0 SET /A id1*=-1
 REM mzOp2 set Start and End positions
 FOR %%A IN (!RANDOM! 0 1 2) DO FOR %%B IN (!RANDOM! 0 1 2) DO ( SET /A mt0+=1
@@ -432,10 +458,11 @@ IF !display! NEQ 0 (
 	MODE CON COLS=%wide% LINES=%modeHigh%
 	COLOR !bgClr!!fgClr!)
 
-REM maze selection bias 0-9: 0x1,1x3,2x3,3x1,4x2
-       IF !mzSelect! GEQ 8 (SET mzSelect=1
-) ELSE IF !mzSelect! GEQ 6 (SET mzSelect=2
-) ELSE IF !mzSelect! GEQ 5 SET mzSelect=4
+REM maze selection bias 0-13: 0x1,1x3,2x3,3x2,4x2,5x1,6x1,7x1
+       IF !mzSelect! GEQ 12 (SET mzSelect=1
+) ELSE IF !mzSelect! GEQ 10 (SET mzSelect=2
+) ELSE IF !mzSelect! GEQ 9 (SET mzSelect=3
+) ELSE IF !mzSelect! GEQ 8 SET mzSelect=4
 REM solve selection bias 1-10: 1x3,2x2,3x5
        IF !svSelect! GEQ 9 (SET svSelect=1
 ) ELSE IF !svSelect! GEQ 8 (SET svSelect=2
@@ -447,8 +474,11 @@ IF       !yn! EQU 0 CALL :mazing_hunt_kill 1 100 !hvBias!
 IF       !yn! EQU 1 CALL :mazing_growing_tree 1 100 !hvBias! )
 IF !mzSelect! EQU 1 CALL :mazing_hunt_kill !hk1! !rsBias! !hvBias!
 IF !mzSelect! EQU 2 CALL :mazing_growing_tree !gt1! !rsBias! !hvBias!
-IF !mzSelect! EQU 3 CALL :mazing_itr_division !id1! !id2! !idBias!
-IF !mzSelect! GEQ 4 CALL :mazing_ellers !hvBias!
+IF !mzSelect! EQU 3 CALL :mazing_wall_division !id1! !id2! !idBias!
+IF !mzSelect! EQU 4 CALL :mazing_ellers !hvBias!
+IF !mzSelect! EQU 5 CALL :mazing_growing_tree 0 0 !hvBias! %=  Prim's Algorithm  =%
+IF !mzSelect! EQU 6 CALL :mazing_kruskals !hvBias!
+IF !mzSelect! GEQ 7 CALL :mazing_wilsons !wa1! !hvBias!
 IF ERRORLEVEL 3 GOTO :mazing_stop
 IF ERRORLEVEL 2 GOTO :mazing_restart
 
@@ -489,7 +519,7 @@ REM solve maze
 IF !svSelect! GTR 0 ( SET "startTime=%TIME% %DATE%"
 	IF !svSelect! EQU 1 CALL :mazing_wall_follow !solve!
 	IF !svSelect! EQU 2 CALL :mazing_dead_filler !solve!
-	IF !svSelect! GEQ 3 CALL :mazing_path_finder !solve! !pfWorms!
+	IF !svSelect! GEQ 3 CALL :mazing_path_finder !solve!
 	IF ERRORLEVEL 3 GOTO :mazing_stop
 	IF ERRORLEVEL 2 GOTO :mazing_restart
 	IF !display! NEQ 0 ( !clear!
@@ -537,7 +567,7 @@ SET return=mCh=!mCh!" "mazeCnt=!mazeCnt!" "totalCnt=!totalCnt!" "loopCnt=!loopCn
 FOR /L %%A IN (0,1,%opCnt%) DO SET return=!return!" "mzOp%%A=!mzOp%%A!" "mView%%A=!mView%%A!
 %mazingDebug% SET>%~f0.debug.menu.txt
 ENDLOCAL & FOR %%A IN ("%return%") DO SET %%A
-IF %mazeCnt% LSS %maxLoop% GOTO :mazing_loop
+IF %loopCnt% LSS %maxLoop% GOTO :mazing_loop
 ECHO.
 ECHO Max Loops = %maxLoop%, exiting...
 IF DEFINED mazeFile ECHO Max Loops = %maxLoop%, exiting...>>"!mazeFile!"
@@ -546,29 +576,29 @@ IF DEFINED mazeFile ECHO Max Loops = %maxLoop%, exiting...>>"!mazeFile!"
 CALL :timeSince %totalTime%
 IF !loopCnt! GTR 0 IF DEFINED mazeFile ECHO(!totalCnt! total mazes, !loopCnt! this session in !TS_! >>"!mazeFile!"
 IF !loopCnt! GTR 0 IF DEFINED mazeFile ECHO(_______________________________________________________________________________>>"!mazeFile!"
-TITLE %~n0: !loopCnt! mazes in !TS_!
+TITLE Maze#!mazeCnt! ^| %~n0: !loopCnt! mazes in !TS_!
 IF DEFINED BG_restart START CMD /C "%~f0" skipMenu:Y %*
 %mazingDebug% SET>%~f0.debug.stop.txt
 ENDLOCAL
 EXIT /B 0
 
 :mazing_hunt_kill stackType rsBias hvBias
-REM %1=stack direction. 0=FIFO, else=LIFO
+REM %1=stack direction. <0=FIFO, else=LIFO mod5=display all crumbs in trail
 REM %2=next node bias. 0=always random, 100=always stack, >100=oldest/newest
 REM %3=directional bias. 1=most vertical, 99=most horizontal
 REM If %1<>0 and %2=100 then algorithm is Depth-First BackTracker.
 REM If %2>100 then stack will alternate between oldest and newest entries.
 
-SET /A "stk=%~1, curPos=bgnPos, nodes=cols*rows, lbClr=cnt=c1=0, nCnt=trail=far=1, d1=100-%~2, vBias=100-%~3, hBias=%~3, t1=curPos+1, cTmp=wide-4, exClr=!RANDOM!%%(colorCnt-2)"
+SET /A "ud=%~1%%5, curPos=bgnPos, nodes=cols*rows, lbClr=cnt=c1=0, nCnt=trail=far=1, d1=100-%~2, vBias=100-%~3, hBias=%~3, t1=curPos+1, cTmp=wide-4, exClr=!RANDOM!%%(colorCnt-2)"
 IF %~3 GTR 99 SET /A "vBias=1, hBias=99"
 IF %~3 LSS 1 SET /A "vBias=99, hBias=1"
 SET "title0=Hunt & Kill"
-IF %~1 NEQ 0 IF %~2 EQU 100 SET title0=BackTracker
+IF %~1 GEQ 0 IF %~2 EQU 100 SET title0=BackTracker
 
 REM set bottom message
-IF %~1 EQU 0 ( SET "msg= FIFO"
+IF %~1 LSS 0 ( SET "msg= FIFO"
 ) ELSE SET "msg= LIFO"
-IF %~2 LSS 1 ( SET "msg=!msg!:hunt=always:stack=never"
+IF %~2 LSS 1 ( SET "msg= hunt=always:stack=never"
 ) ELSE IF %~2 EQU 100 ( SET "msg=!msg!:hunt=never:stack=always"
 ) ELSE IF %~2 GTR 100 ( SET "msg=!msg!:hunt=never:stack=old/new"
 ) ELSE SET "msg=!msg!:hunt=!d1!%%:stack=%~2%%"
@@ -588,6 +618,8 @@ SET "mz=!mz:~0,%curPos%!!player!!mz:~%t1%!"
 SET "r1=!wall!!wall!!labelTop!!top!"
 SET "mazeTop=!r1:~0,%wide%!"
 SET "mz=!mazeTop!!mz:~%wide%!"
+SET "tHall=!hall!"
+IF !ud! EQU 0 SET "tHall=!crumb!"
 
 REM set display
 IF !display! NEQ 0 (!clear!
@@ -628,14 +660,14 @@ FOR /L %%? IN (1,1,64) DO IF !nCnt! LSS !nodes! FOR /L %%@ IN (1,1,64) DO IF !nC
 		SET /A "nCnt+=1, pct=nCnt*100/nodes, trail+=1, rChk=!RANDOM!%%rCnt"%= 'nCnt=nodeCount=#of nodes added to maze, trail=#of entries in stack, rChk=random entry in selection list =%
 		FOR %%A IN (!rChk!) DO FOR %%B IN (!rand:~%%A^,1!) DO SET /A "newPos=!%%Bp!, nTmp=newPos+1, mw=!%%Bw!, mTmp=mw+1"
 		SET "cp=...!newPos!"%= 'snag random character from selection list and use it to set directional variables =%
-		IF %~1 EQU 0 (%=                      'param1=0=stack is FIFO, so place newPosition on bottom of stack =%
+		IF %~1 LSS 0 (%=                      'param1<0=stack is FIFO, so place newPosition on bottom of stack =%
 			SET "stack=!stack!!cp:~-4! "
 		) ELSE SET "stack= !cp:~-4!!stack!"%= 'else it's LIFO, so place on top instead =%
 		FOR /F "tokens=1-4" %%A IN ("!mw! !mTmp! !newPos! !nTmp!") DO (
-			SET "mz=!mz:~0,%%A!!hall!!mz:~%%B!"%= 'replace walls with hall+crumb characters in the newPositions =%
+			SET "mz=!mz:~0,%%A!!tHall!!mz:~%%B!"%= 'replace walls with hall+crumb characters in the newPositions =%
 			SET "mz=!mz:~0,%%C!!crumb!!mz:~%%D!"
 			IF !display! GTR 0 ( SET /A "r1=%%A/wide, c1=%%A-r1*wide, r2=%%C/wide, c2=%%C-r2*wide"
-				BG.EXE FCPrint !r1! !c1! !bgClr!!exClr! "!hall!"
+				BG.EXE FCPrint !r1! !c1! !bgClr!!exClr! "!tHall!"
 				BG.EXE FCPrint !r2! !c2! !bgClr!!exClr! "!crumb!"
 			)
 		)
@@ -658,7 +690,7 @@ FOR /L %%? IN (1,1,64) DO IF !nCnt! LSS !nodes! FOR /L %%@ IN (1,1,64) DO IF !nC
 		%EKO%!msg:~1!
 	)%=    'check for user menu, animate by clearing and EKOing maze =%
 	IF !trail! GTR !far! SET /A far=trail%= 'set highest stack count =%
-	TITLE Maze#!mazeCnt!: !title0! !pct!%% nodes:!nodes!/!nCnt! top:!far!/!trail! #!cnt!  %titleCS% %titleGK% !title1!
+	TITLE Maze#!mazeCnt! ^| !title0! ^| !pct!%% n:!nCnt!/!nodes! ^| #!cnt! top:!far!/!trail! ^| %titleCS% %titleGK% ^| !title1! !TIME: =0!
 	SET /A curPos=newPos%=      'rCnt=0 means no new direction found, so clear currentPosition to force new position from stack =%
 	IF !rCnt! EQU 0 SET curPos=
 )
@@ -670,6 +702,7 @@ EXIT /B 0
 REM %1=size of list for selecting cells. 0=all, >0=LIFO, <0=FIFO.
 REM %2=next node bias. 0=always random, 100=always stack, >100=oldest/newest
 REM %3=directional bias. 1=most vertical, 99=most horizontal.
+REM If %1=0 and %2=0 the algorithm is randomized Prim's.
 REM If %1>0 and %2=100 then algorithm is Depth-First BackTracker.
 REM If %2>100 then stack will alternate between oldest and newest entries.
 
@@ -679,16 +712,18 @@ IF !lst! LSS 0 SET /A "stk=lst*=-1"
 IF %~3 GTR 99 SET /A "vBias=1, hBias=99"
 IF %~3 LSS 1 SET /A "vBias=99, hBias=1"
 SET title0=Growing Tree
+IF %~1 EQU 0 IF %~2 EQU 0 SET title0=Prim's Algor
 IF %~1 EQU 1 IF %~2 EQU 100 SET title0=BackTracker
 
 REM set bottom message
 IF %~1 EQU 0 ( SET "msg= LIFO list=all"
+	IF %~2 EQU 0 SET "msg= list=all"
 ) ELSE IF %~1 GTR 0 ( SET "msg= LIFO list=!lst!"
 ) ELSE SET "msg= FIFO list=!lst!"
-IF %~2 LSS 1 ( SET "msg=!msg!:random=always:stack=never"
-) ELSE IF %~2 EQU 100 ( SET "msg=!msg!:random=never:stack=always"
-) ELSE IF %~2 GTR 100 ( SET "msg=!msg!:random=never:stack=old/new"
-) ELSE SET "msg=!msg!:random=!d1!%%:stack=%~2%%"
+IF %~2 LSS 1 ( SET "msg=!msg!:random=always:list=never"
+) ELSE IF %~2 EQU 100 ( SET "msg=!msg!:random=never:list=always"
+) ELSE IF %~2 GTR 100 ( SET "msg=!msg!:random=never:list=old/new"
+) ELSE SET "msg=!msg!:random=!d1!%%:list=%~2%%"
 SET "msg=!msg!:vrt=!vBias!%%:hrz=!hBias!%%"
 SET "labelTop= %title0% %cols%x%rows% "
 SET "mm=!msg:~1!"
@@ -780,13 +815,13 @@ FOR /L %%? IN (1,1,64) DO IF !nCnt! LSS !nodes! FOR /L %%@ IN (1,1,64) DO IF !nC
 		%EKO%!msg:~1!
 	)
 	IF !trail! GTR !far! SET "far=!trail!"
-	TITLE Maze#!mazeCnt!: !title0! !pct!%% nodes:!nodes!/!nCnt! top:!far!/!trail! #!cnt!  %titleCS% %titleGK% !title1!
+	TITLE Maze#!mazeCnt! ^| !title0! ^| !pct!%% n:!nCnt!/!nodes! ^| #!cnt! top:!far!/!trail! ^| %titleCS% %titleGK% ^| !title1! !TIME: =0!
 )
 REM clear crumbs and exit
 SET "mz=!mz:%crumb%=%hall%!"
 EXIT /B 0
 
-:mazing_itr_division wallOpen stackType hvBias
+:mazing_wall_division wallOpen stackType hvBias
 REM %1=open walls where? 0=NW, 1=SE, 2=alternate NW/SE, 
 REM                      3=midNW, 4=midSE, 5+=random
 REM %2=stack order. 0-7=static pre-sets, 8+=random.
@@ -801,7 +836,7 @@ IF "!wall!" EQU "ÿ" SET "fill=!crumb!"
 IF %~3 GTR 99 SET /A "vBias=1, hBias=99"
 IF %~3 LSS 1 SET /A "vBias=99, hBias=1"
 IF !bgClr! LSS 7 SET "lbClr=F"
-SET "title0=Itr. Division"
+SET "title0=Wall Division"
 
 REM set bottom message
 IF %~1 EQU 0 ( SET "msg= wallOpen=NW"
@@ -820,7 +855,8 @@ REM create empty maze with borders
 SET "top=!wall!"
 FOR /L %%A IN (1,1,5) DO SET "top=!top!!top!!top!!top!"
 SET "top=!top:~-%wide%!"
-SET "mazeTop= Itr. Division %cols%x%rows% "
+SET "mazeTop= Wall Division %cols%x%rows% "
+IF %~3 EQU 50 SET "mazeTop= Volvo Division %cols%x%rows% "
 SET "labelTop=!mazeTop:~0,%cTmp%!"
 SET "mazeTop=!wall!!wall!!labelTop!!top!"
 SET "mazeTop=!mazeTop:~0,%wide%!"
@@ -843,7 +879,7 @@ SET "stack=0:0:!t1!:!t2! "
 
 REM ULrow ULcolumn #wallsDown #wallsRight
 FOR /L %%? IN (1,1,64) DO IF DEFINED stack FOR /L %%@ IN (1,1,64) DO IF DEFINED stack (
-	%mazingDebug% SET>%~f0.debug.ItrDivision.txt
+	%mazingDebug% SET>%~f0.debug.WallDivision.txt
 	SET /A cnt+=1
 	IF %~1 EQU 2 SET /A "p1=(p1+1)&1"
 	FOR /F "tokens=1-4 delims=: " %%A IN ("!stack!") DO (
@@ -916,9 +952,9 @@ FOR /L %%? IN (1,1,64) DO IF DEFINED stack FOR /L %%@ IN (1,1,64) DO IF DEFINED 
 		ECHO(!mz!
 		%EKO%!msg:~1!
 	)
-	IF !nCnt! LEQ !block! TITLE Maze#!mazeCnt!: !title0! !pct!%% block:!block!/!nCnt! #!cnt!  %titleCS% %titleGK% !title1!
+	IF !nCnt! LEQ !block! TITLE Maze#!mazeCnt! ^| !title0! ^| !pct!%% #!cnt! block:!nCnt!/!block! ^| %titleCS% %titleGK% ^| !title1! !TIME: =0!
 )
-TITLE Maze#!mazeCnt!: !title0! 100%% block:!block!/!block! #!cnt!  %titleCS% %titleGK% !title1!
+TITLE Maze#!mazeCnt! ^| !title0! ^| 100%% #!cnt! block:!block!/!block! ^| %titleCS% %titleGK% ^| !title1! !TIME: =0!
 SET "mz=!mz:%crumb%=%hall%!"
 EXIT /B 0
 
@@ -971,7 +1007,7 @@ FOR /L %%A IN (1,1,%rows%) DO (
 	SET "hlz=!wall!!fill!"
 	SET "stack=;!c1! "
 	SET /A "last=c1, pct=%%A*100/rows"
-	TITLE Maze#!mazeCnt!: !title0! !pct!%% hrz=!hBias!%%/vrt=!vBias!%%  %titleCS% %titleGK% !title1!
+	TITLE Maze#!mazeCnt! ^| !title0! ^| !pct!%% hrz=!hBias!%% vrt=!vBias!%% ^| %titleCS% %titleGK% ^| !title1! !TIME: =0!
 	FOR /L %%B IN (2,1,%cols%) DO (
 		SET /A "rc=!RANDOM!%%100"
 		IF %%A EQU %rows% SET rc=0
@@ -1016,17 +1052,320 @@ IF !display! GTR 0 ( BG.EXE Locate 1 0
 )
 EXIT /B 0
 
+:mazing_kruskals hvBias
+REM %1=directional bias. 1=most vertical, 99=most horizontal
+SET /A "vwCnt=hwCnt=pctN=pctW=0,nCnt=1,vBias=100-%~1,hBias=%~1,bp1=bgnPos+1,lt1=wide-4"
+IF %~1 GTR 99 SET /A "vBias=1, hBias=99"
+IF %~1 LSS 1 SET /A "vBias=99, hBias=1"
+SET "title0=Kruskal's Algor"
+
+REM set bottom message
+SET "msg= vrt=!vBias!%%:hrz=!hBias!%%"
+SET "labelTop= %title0% %cols%x%rows% "
+SET "mm=!msg:~1!"
+SET "msg=!msg:~0,%wide%!"
+
+REM fill maze with 8186 walls, clip to size, and open starting position
+SET "labelTop=!labelTop:~0,%lt1%!"
+SET "mz=!wall!"
+FOR /L %%A IN (1,1,6) DO SET "mz=!mz!!mz!!mz!!mz!"
+SET "top=!mz:~-%wide%!"
+SET "mz=!mz:~3!!mz:~3!"
+SET "mz=!mz:~0,%size%!"
+SET "mz=!mz:~0,%bgnPos%!!player!!mz:~%bp1%!"
+SET "r1=!wall!!wall!!labelTop!!top!"
+SET "mazeTop=!r1:~0,%wide%!"
+SET "mz=!mazeTop!!mz:~%wide%!"
+SET "fil1=!hall!"
+SET "fil2=!hall!"
+SET "fil!ynm!=!crumb!"
+IF "!wall!" EQU "ÿ" SET "fil1=!crumb!" & SET "fil2=!crumb!"
+
+REM set display
+IF !display! NEQ 0 (!clear!
+	ECHO(!mz!
+	%EKO%!msg:~1!
+)
+IF !display! GTR 0 CALL :mazing_BGcolor
+
+REM create findMerge.cmd, by far the fastest way I've found for union-Find/Merge in batch
+IF NOT EXIST %~n0.uMerge.cmd (
+	ECHO :mazing_uMerge
+	ECHO IF ^^^!ka%%um1%%^^^! NEQ %%um1%% ^( SET um1=^^^!ka%%um1%%^^^!
+	ECHO SET umFix=%%umFix%% %%um1%%
+	ECHO GOTO :mazing_uMerge ^)
+	ECHO IF ^^^!ka%%um2%%^^^! NEQ %%um2%% ^( SET um2=^^^!ka%%um2%%^^^!
+	ECHO SET umFix=%%umFix%% %%um2%%
+	ECHO GOTO :mazing_uMerge ^)
+	ECHO FOR %%%%X IN ^(%%um1%% %%umFix:~1%%^) DO SET ka%%%%X=%%um2%%
+	ECHO IF %%um1%% NEQ %%um2%% EXIT /B 1
+	ECHO EXIT /B 0
+) > %~n0.uMerge.cmd
+
+REM build wall list and disjoint set for :unionMerge
+FOR /L %%A IN (1,1,%rows%) DO (
+	TITLE Maze#!mazeCnt! ^| !title0! sorting walls ^| row# %%A of %rows% ^| vw:!vwCnt! hw:!hwCnt! %titleCS% %titleGK% !title1! !TIME: =0!
+	FOR /L %%B IN (1,1,%cols%) DO (
+		%BGgrabKey%
+		IF NOT EXIST "%keyFile%" CALL :mazing_menu
+		IF ERRORLEVEL 2 EXIT /B !ERRORLEVEL!
+		%colorShift%
+		SET /A "np=wide*%%A*2-wide+%%B*2-1,vp=np+2,hp=np+wide*2,vChk=wide*%%A*2"
+		IF !vp! LSS !vChk! SET /A "vn!vwCnt!=np,vw!vwCnt!=np+1,vp!vwCnt!=vp,vwCnt+=1"
+		IF !hp! LSS !size! SET /A "hn!hwCnt!=np,hw!hwCnt!=np+wide,hp!hwCnt!=hp,hwCnt+=1"
+		SET "ka!np!=!np!"
+	)
+)
+
+REM loop through #walls, select from V/H wallLists, uMerge positions, and carve new openings
+SET /A "numWalls=cols*rows*2-cols-rows-1,numNodes=cols*rows"
+FOR /L %%@ IN (!numWalls!,-1,0) DO (
+	SET /A "pctN=nCnt*100/numNodes,tn=numNodes-nCnt,pctW=(numWalls-%%@)*100/numWalls,rBias=!RANDOM!%%100,umFix=umt1=umt2=0"
+	%mazingDebug% SET>%~f0.debug.Kruskals.txt
+	%BGgrabKey%
+	IF NOT EXIST "%keyFile%" CALL :mazing_menu
+	IF ERRORLEVEL 2 EXIT /B !ERRORLEVEL!
+	IF !delay! GTR 0 CALL :mazing_wait !delay!
+	%colorShift%
+	REM check directionalbias and select from wall lists
+	IF !vwCnt! LEQ 0 SET rBias=99
+	IF !hwCnt! LEQ 0 SET rBias=0
+	IF !rBias! LSS !hBias! ( SET /A vwRnd=!RANDOM!%%vwCnt,vwCnt-=1
+		SET /A rn=rn1=um1=vn!vwRnd!,rw=rw1=vw!vwRnd!,rp=rp1=um2=vp!vwRnd!,vn!vwRnd!=vn!vwCnt!,vw!vwRnd!=vw!vwCnt!,vp!vwRnd!=vp!vwCnt!,rn1+=1,rw1+=1,rp1+=1
+		SET "vn!vwCnt!=" & SET "vw!vwCnt!=" & SET "vp!vwCnt!="
+	) ELSE ( SET/A hwRnd=!RANDOM!%%hwCnt,hwCnt-=1
+		SET /A rn=rn1=um1=hn!hwRnd!,rw=rw1=hw!hwRnd!,rp=rp1=um2=hp!hwRnd!,hn!hwRnd!=hn!hwCnt!,hw!hwRnd!=hw!hwCnt!,hp!hwRnd!=hp!hwCnt!,rn1+=1,rw1+=1,rp1+=1
+		SET "hn!hwCnt!=" & SET "hw!hwCnt!=" & SET "hp!hwCnt!="
+	)	
+	REM check positional sets and carve wall if merged
+	CALL %~n0.uMerge.cmd
+	IF ERRORLEVEL 1 FOR /F "tokens=1-6" %%A IN ("!rn! !rp! !rw! !rn1! !rp1! !rw1!") DO (
+		IF "!mz:~%%A,1!" EQU "!wall!" SET "alt1=!fil1!" & SET /A nCnt+=1
+		IF "!mz:~%%A,1!" EQU "!fil1!" SET "alt1=!fil2!"
+		IF "!mz:~%%B,1!" EQU "!wall!" SET "alt2=!fil1!" & SET /A nCnt+=1
+		IF "!mz:~%%B,1!" EQU "!fil1!" SET "alt2=!fil2!"
+		IF !rBias! LSS !hBias! (
+			SET "mz=!mz:~0,%%A!!alt1!!hall!!alt2!!mz:~%%E!"
+		) ELSE (
+			SET "mz=!mz:~0,%%A!!alt1!!mz:~%%D!"
+			SET "mz=!mz:~0,%%B!!alt2!!mz:~%%E!"
+			SET "mz=!mz:~0,%%C!!hall!!mz:~%%F!"
+		)
+		IF %%A EQU !bgnPos! SET "mz=!mz:~0,%bgnPos%!!player!!mz:~%bp1%!"
+		IF %%B EQU !bgnPos! SET "mz=!mz:~0,%bgnPos%!!player!!mz:~%bp1%!"
+		IF !display! LSS 0 ( !clear!
+			ECHO(!mz!
+			%EKO%!msg:~1!
+		)
+		IF !display! GTR 0 ( SET /A "r1=%%A/wide,c1=%%A-r1*wide,r2=%%B/wide,c2=%%B-r2*wide,r3=%%C/wide,c3=%%C-r3*wide"
+			IF %%A NEQ !bgnPos! BG.EXE FCPrint !r1! !c1! !bgClr!!exClr! "!alt1!"
+			IF %%B NEQ !bgnPos! BG.EXE FCPrint !r2! !c2! !bgClr!!exClr! "!alt2!"
+			BG.EXE FCPrint !r3! !c3! !bgClr!!exClr! "!hall!"
+		)
+	)
+	TITLE Maze#!mazeCnt! ^| !title0! ^| !pctN!%% n:!tn! ^| !pctW!%% w:%%@ ^| vw:!vwCnt! hw:!hwCnt! %titleCS% %titleGK% ^| !title1! !TIME: =0!
+)
+REM clear crumbs and variables then exit
+FOR /F "delims==" %%A IN ('SET ka') DO SET %%A=
+SET "mz=!mz:%crumb%=%hall%!"
+EXIT /B 0
+
+REM uFind/Merge pared down to a for loop, still 2-3 times slower than the batch file
+SET "ufFix="
+FOR /L %%A IN (1,1,12) DO ( SET /A t1=ka!uf1!,t2=ka!uf2!
+	IF !uf1! NEQ !t1! SET /A "uf1=ka!uf1!" & SET "ufFix=!ufFix! !uf1!"
+	IF !uf2! NEQ !t2! SET /A "uf2=ka!uf2!" & SET "ufFix=!ufFix! !uf2!"
+)
+FOR %%A IN (!uf1! !ufFix!) DO SET ka%%A=!uf2!
+IF !uf1! NEQ !uf2! ...
+
+:mazing_wilsons #ofAdditionalEntryPoints hvBias
+REM %1 number of additional entry points, maze=crumbs if negative
+REM %1 odd=reverse crumbs+halls in walk / don't show loop animation
+REM %1 mod3 0=crumb+hall / 1=all crumbs / 2=all halls
+REM %2=directional bias. 1=most vertical, 99=most horizontal
+SET /A "addEntry=%~1,lr=%~1%%2,uds=%~1%%3,vBias=100-%~2,hBias=%~2,numNodes=nCnt=cols*rows,curPos=bt=bgnPos,bgCnt=pct=cnt=t1=t2=t3=0,t4=wide-4,nCnt-=1,bt+=1"
+IF %~1 LSS 0  SET /A addEntry*=-1
+IF %~2 LSS 1  SET /A vBias=99,hBias=1
+IF %~2 GTR 99 SET /A vBias=1,hBias=99
+SET "title0=Wilson's Algor"
+
+REM set bottom message
+SET "msg= addEntry=!addEntry!:vrt=!vBias!%%:hrz=!hBias!%%"
+SET "labelTop= %title0% %cols%x%rows% "
+SET "mm=!msg:~1!"
+SET "msg=!msg:~0,%wide%!"
+
+REM fill maze with 8186 walls, clip to size, and open starting position
+SET "labelTop=!labelTop:~0,%t4%!"
+SET "mz=!wall!"
+FOR /L %%A IN (1,1,6) DO SET "mz=!mz!!mz!!mz!!mz!"
+SET "top=!mz:~-%wide%!"
+SET "mz=!mz:~3!!mz:~3!"
+SET "mz=!mz:~0,%size%!"
+SET "mz=!mz:~0,%bgnPos%!!player!!mz:~%bt%!"
+SET "r1=!wall!!wall!!labelTop!!top!"
+SET "mazeTop=!r1:~0,%wide%!"
+SET "mz=!mazeTop!!mz:~%wide%!"
+
+REM set display
+IF !display! NEQ 0 (!clear!
+	ECHO(!mz!
+	%EKO%!msg:~1!
+)
+
+REM set display characters
+SET "tMaze=!hall!"
+SET "tHall=!hall!"
+SET "tCrumb=!crumb!"
+IF %~1   LSS 0 SET /A uds*=-1
+IF %~1   LSS 0 SET "tMaze=!crumb!"
+IF !lr!  NEQ 0 SET "tHall=!crumb!" & SET "tCrumb=!hall!"
+IF !uds! EQU 1 SET "tHall=!crumb!" & SET "tCrumb=!crumb!"
+IF !uds! EQU 2 IF "!wall!" NEQ "ÿ" SET "tHall=!hall!" & SET "tCrumb=!hall!"
+IF "!wall!" EQU "ÿ" SET "tMaze=!crumb!"
+
+REM build node list for random entry
+TITLE Maze#!mazeCnt! ^| !title0! sorting nodes, please wait...
+FOR /L %%A IN (1,1,%rows%) DO FOR /L %%B IN (1,1,%cols%) DO (
+	SET /A np=wide*%%A*2-wide+%%B*2-1
+	SET mz_!np!=0
+)
+REM create random entry point(s)
+SET "mz_!bgnPos!="    'mark start position as visited
+SET "walk!bgnPos!=1"  'and set it as start of random walk
+SET /A "t0=(addEntry+1)*2"
+FOR /L %%A IN (0,1,!t0!) DO IF !t3! LEQ !addEntry! (
+	SET /A "t1=t2=(!RANDOM!%%cols*2+1)+(!RANDOM!%%rows*2+1)*wide,t2+=1"
+	IF DEFINED mz_!t1! FOR /F "tokens=1,2" %%B IN ("!t1! !t2!") DO (
+		SET "mz=!mz:~0,%%B!!tMaze!!mz:~%%C!"
+		SET "ae_!t3!=%%B %%C"
+		SET "mz_%%B="
+		SET /A t3+=1
+	)
+)
+
+IF !display! NEQ 0 (!clear!
+	ECHO(!mz!
+	%EKO%!msg:~1!
+)
+IF !display! GTR 0 CALL :mazing_BGcolor
+
+REM build directional bias lists
+FOR %%A IN (n s e w) DO SET "%%ABias=%%A"%=                                  'start each list with a single character =%
+FOR /L %%A IN (2,1,!hBias!) DO SET "eBias=!eBias!e" & SET "wBias=!wBias!w"%= 'stack characters to represent percentage =%
+FOR /L %%A IN (2,1,!vBias!) DO SET "nBias=!nBias!n" & SET "sBias=!sBias!s"%= 'chance to select each direction =%
+
+FOR /L %%? IN (1,1,1024) DO IF !nCnt! GTR 0 FOR /L %%@ IN (1,1,1024) DO IF !nCnt! GTR 0 (
+	%mazingDebug% SET>%~f0.debug.Wilsons.txt
+	%BGgrabKey%
+	IF NOT EXIST "%keyFile%" CALL :mazing_menu
+	IF ERRORLEVEL 2 EXIT /B !ERRORLEVEL!
+	IF !delay! GTR 0 CALL :mazing_wait !delay!
+	%colorShift%
+	IF !curPos! EQU 0 ( REM start new random walk
+		SET /A t1=!RANDOM!%%nCnt,t2=-1,rWalk=1
+		IF !nCnt! GTR 1000 IF !cnt! GTR !bgCnt! TITLE Maze#!mazeCnt! ^| !title0! ^| !pct!%% n:!numNodes!/!nCnt! ^| #!t1! selecting node, please wait...
+		SET /A bgCnt=cnt+8
+		FOR /F "delims=mz_=" %%A IN ('SET mz_') DO ( REM get list of unvisited cells
+			SET /A t2+=1,t3=%%A+1
+			IF !t1! EQU !t2! FOR %%B IN (!t3!) DO ( REM select one at random
+				SET "mz=!mz:~0,%%A!!tCrumb!!mz:~%%B!"
+				SET /A curPos=%%A,walk%%A=rWalk
+				SET "mz_%%A="
+				IF !display! GTR 0 ( SET /A r1=%%A/wide,c1=%%A-r1*wide
+					BG.EXE FCPrint !r1! !c1! !bgClr!!pClr! "!tCrumb!"
+				)
+			)
+		)
+	)
+	REM calculate positions and build directional bias list
+	SET "rBias="
+	SET /A "np=curPos-wide*2,sp=curPos+wide*2,ep=curPos+2,wp=curPos-2,nw=curPos-wide,sw=curPos+wide,ew=curPos+1,ww=curPos-1,wChk=curPos/wide*wide,eChk=wChk+wide,rCnt=0,cnt+=1"
+	FOR /F "tokens=1-4" %%A IN ("!nw! !sw! !ew! !ww!") DO (%= 'np/sp/ep/wp=north/south/east/west hallPosition, nw/sw/ew/ww=north/south/east/west wallPosition, wChk/eChk=east/west check for maze border =%
+		IF !np! GTR !wide! IF "!mz:~%%A,1!" EQU "!wall!" SET /A rCnt+=vBias & SET "rBias=!nBias!!rBias!"
+		IF !sp! LSS !size! IF "!mz:~%%B,1!" EQU "!wall!" SET /A rCnt+=vBias & SET "rBias=!sBias!!rBias!"
+		IF !ep! LSS !eChk! IF "!mz:~%%C,1!" EQU "!wall!" SET /A rCnt+=hBias & SET "rBias=!eBias!!rBias!"
+		IF !wp! GTR !wChk! IF "!mz:~%%D,1!" EQU "!wall!" SET /A rCnt+=hBias & SET "rBias=!wBias!!rBias!"
+	)
+	REM snag random character from bias list and use it to set directional variables
+	SET /A "rChk=!RANDOM!%%rCnt"
+	FOR %%A IN (!rChk!) DO FOR %%B IN (!rBias:~%%A^,1!) DO SET /A "newPos=pt=!%%Bp!,newWall=wt=!%%Bw!,pt+=1,wt+=1"
+	IF DEFINED mz_!newPos! ( REM cell is unvisited if mz_# variable is defined for this position
+		FOR /F "tokens=1-4" %%A IN ("!newWall! !wt! !newPos! !pt!") DO (
+			SET "mz=!mz:~0,%%A!!tHall!!mz:~%%B!"
+			SET "mz=!mz:~0,%%C!!tCrumb!!mz:~%%D!"
+			SET "step!rWalk!=%%A %%B %%C %%D"
+			SET /A walk%%C=rWalk+=1,curPos=newPos,nCnt-=1
+			SET "mz_%%C="
+			IF !display! GTR 0 ( SET /A r1=%%A/wide,c1=%%A-r1*wide,r2=%%C/wide,c2=%%C-r2*wide
+				BG.EXE FCPrint !r1! !c1! !bgClr!!pClr! "!tHall!"
+				BG.EXE FCPrint !r2! !c2! !bgClr!!pClr! "!tCrumb!"
+			)
+		)
+	
+	) ELSE IF DEFINED walk!newPos! ( REM cell is part of random walk if walk# variable is defined for this position
+		SET /A loopEnd=rWalk-1,rWalk=walk!newPos!,curPos=newPos
+		FOR /L %%A IN (!rWalk!,1,!loopEnd!) DO FOR /F "tokens=1-4" %%B IN ("!step%%A!") DO (
+			SET "mz=!mz:~0,%%B!!wall!!mz:~%%C!"
+			SET "mz=!mz:~0,%%D!!wall!!mz:~%%E!"
+			SET /A mz_%%D=0,nCnt+=1
+			SET "step%%A="
+			SET "walk%%D="
+			IF !display! LSS 0 IF !lr! EQU 0 ( !clear!
+				ECHO(!mz!
+				%EKO%!msg:~1!
+			)
+			IF !display! GTR 0 ( SET /A r1=%%B/wide,c1=%%B-r1*wide,r2=%%D/wide,c2=%%D-r2*wide
+				BG.EXE FCPrint !r1! !c1! !bgClr!!gClr! "!wall!"
+				BG.EXE FCPrint !r2! !c2! !bgClr!!gClr! "!wall!"
+			)
+		)
+	) ELSE ( REM cell is part of maze if the other two conditions are untrue
+		REM correct additional entry points if they exist
+		IF DEFINED ae_0 FOR /L %%A IN (0,1,!addEntry!) DO (
+			FOR /F "tokens=1,2" %%B IN ("!ae_%%A!") DO IF %%B NEQ !newPos! (
+				SET "mz=!mz:~0,%%B!!wall!!mz:~%%C!"
+				SET "mz_%%B=0"
+			)
+			SET "ae_%%A="
+		)
+		FOR /F "tokens=1,2" %%A IN ("!newWall! !wt!") DO SET "mz=!mz:~0,%%A!!tHall!!mz:~%%B!"
+		FOR /F "delims==" %%A IN ('SET step 2^>NUL') DO SET %%A=
+		FOR /F "delims==" %%A IN ('SET walk') DO SET %%A=
+		IF "!tMaze!" NEQ "!tHall!" (
+			SET "mz=!mz:%tHall%=%tMaze%!"
+		) ELSE IF "!tMaze!" NEQ "!tCrumb!" SET "mz=!mz:%tCrumb%=%tMaze%!"
+		IF "!tMaze!" NEQ "!hall!" SET "mz=!mazeTop!!mz:~%wide%!"
+		SET /A curPos=0,nCnt-=1
+		IF !display! GTR 0 ( !clear!
+			ECHO(!mz!
+			%EKO%!msg:~1!
+			IF !cnt! GTR !bgCnt! CALL :mazing_BGcolor
+		)
+	)
+	IF !display! LSS 0 ( !clear!
+		ECHO(!mz!
+		%EKO%!msg:~1!
+	)
+	SET /A "pct=(numNodes-nCnt)*100/numNodes"
+	IF !rWalk! GTR !far! SET far=!rWalk!
+	TITLE Maze#!mazeCnt! ^| !title0! ^| !pct!%% n:!numNodes!/!nCnt! ^| #!cnt! walk:!far!/!rWalk! ^| %titleCS% %titleGK% ^| !title1! !TIME: =0!
+)
+SET "mz=!mz:%crumb%=%hall%!"
+EXIT /B 0
+
 :mazing_rebuild boxType
 REM %1=type of maze produced. %1<0=random single character, %1>0=box characters 1-12
 SET /A "wd=cols*2,bx=%~1%%(%numOfBoxes%+1),t1=!RANDOM!%%bColorCnt,t2=!RANDOM!%%fColorCnt,t3=!RANDOM!%%wallCnt,t4=!RANDOM!%%crumbCnt,b1=bgnPos+1,e1=endPos+1"
 IF !t1!==!t2! GOTO :mazing_rebuild
-IF %mzOp13% EQU 16 IF %t1% LEQ 7 (IF %t2% LEQ 7 SET/A t2+=8)ELSE IF %t2% GEQ 8 SET/A t2-=8
-IF %mzOp13% LSS 0  SET "bgClr=!bColors:~%t1%,1!"
-IF %mzOp13% GTR 15 SET "bgClr=!bColors:~%t1%,1!"
-IF %mzOp14% LSS 0  SET "fgClr=!fColors:~%t2%,1!"
-IF %mzOp14% GTR 15 SET "fgClr=!fColors:~%t2%,1!"
+IF %mzOp14% EQU 16 IF %t1% LEQ 7 (IF %t2% LEQ 7 SET/A t2+=8)ELSE IF %t2% GEQ 8 SET/A t2-=8
+IF %mzOp14% LSS 0  SET "bgClr=!bColors:~%t1%,1!"
+IF %mzOp14% GTR 15 SET "bgClr=!bColors:~%t1%,1!"
+IF %mzOp15% LSS 0  SET "fgClr=!fColors:~%t2%,1!"
+IF %mzOp15% GTR 15 SET "fgClr=!fColors:~%t2%,1!"
 SET "mTmp=!walls:~%t3%,1!"
-SET "title0=Rebuilding with Box#%~1"
+SET "title0=Rebuilding Box#%~1"
 
 REM change color and wall character and exit
 IF %~1 LSS 0 (
@@ -1060,7 +1399,7 @@ FOR /L %%? IN (0,%wide%,%size%) DO IF %%? LSS %size% (
 	IF NOT EXIST "%keyFile%" CALL :mazing_menu
 	IF ERRORLEVEL 2 EXIT /B !ERRORLEVEL!
 	SET /A "et=%%?+wide, pct=%%?*100/size"
-	TITLE Maze#!mazeCnt!: !title0! !pct!%%  %titleCS% %titleGK% !title1!
+	TITLE Maze#!mazeCnt! ^| !title0! !pct!%% ^| %titleCS% %titleGK% ^| !title1! !TIME: =0!
 	FOR /L %%@ IN (0,1,%wd%) DO (
 		SET /A "cp=%%?+%%@, ct=cp+1, nw=cp-wide, sw=cp+wide, ew=cp+1, ww=cp-1, list=-1"
 		FOR /F "tokens=1-6" %%A IN ("!nw! !sw! !ew! !ww! !cp! !ct!") DO IF "!mz:~%%E,1!" EQU "!wall!" (
@@ -1085,13 +1424,13 @@ FOR /L %%? IN (0,%wide%,%size%) DO IF %%? LSS %size% (
 		%EKO%!msg:~1!
 	)
 )
-TITLE Maze#!mazeCnt!: !title0! 100%%  %titleCS% %titleGK% !title1!
+TITLE Maze#!mazeCnt! ^| !title0! 100%% ^| %titleCS% %titleGK% ^| !title1! !TIME: =0!
 SET "mazeTop=!mz:~0,%wide%!  !labelTop!"
 SET "mazeTop=!mazeTop:~-%wide%!"
 SET "mazeTop=!mz:~0,2!!labelTop!!mazeTop!"
 SET "mazeTop=!mazeTop:~0,%wide%!"
 SET "mz=!mazeTop!!mz:~%wide%!
-IF !mzOp10! LSS 0  SET "crumb=!crumbs:~%t4%,1!"
+IF !mzOp11! LSS 0  SET "crumb=!crumbs:~%t4%,1!"
 IF !display! NEQ 0 ( !clear!
 	COLOR !bgClr!!fgClr!
 	ECHO(!mz!
@@ -1100,8 +1439,9 @@ IF !display! NEQ 0 ( !clear!
 EXIT /B 0
 
 :mazing_wall_follow fillType
-REM %1=write what to maze? %1<0=walls, %1>=0=halls
-SET /A "curPos=bgnPos, nodes=cols*rows, lbClr=c1=0, nCnt=nTmp=cnt=trail=1, cTmp=wide-4, wTmp=!RANDOM!%%2, mTmp=!RANDOM!%%4+1, p1=!RANDOM!%%wallCnt"
+REM %1=write what to maze as backfill? %1<0=walls, %1>=0=halls
+REM %1=odd=use walls as crumbs (with solid backfill if negative) on rebuilt mazes
+SET /A "curPos=bgnPos, nodes=cols*rows, lbClr=c1=0, nCnt=nTmp=cnt=trail=1, cTmp=wide-4, wTmp=!RANDOM!%%2, mTmp=!RANDOM!%%4+1, p1=!RANDOM!%%wallCnt, ud=%~1%%2"
 IF !wTmp! EQU 0 ( REM pick random starting hand
 	SET "hand=Left"
 	SET "listN=s e n w"
@@ -1133,10 +1473,10 @@ SET "tCrumb=!crumb!"
 IF "!wall!"=="ÿ" SET "wall=!walls:~%p1%,1!"
 IF "!wall!"=="ÿ" SET "wall=!xWall!"
 IF %~1 LSS 0 ( SET "fill=!wall!"
-	IF !yn! EQU 0 IF !rebuild! GEQ 6 IF !rebuild! LEQ 9 SET "fill=Û"
-	IF !yn! NEQ 0 IF !rebuild! EQU 10 SET "fill=²"
+	IF !ud! NEQ 0 IF !rebuild! GEQ 6 IF !rebuild! LEQ 9 SET "fill=Û"
+	IF !ud! NEQ 0 IF !rebuild! EQU 10 SET "fill=²"
 )
-IF !ynm! GTR 0 IF !rebuild! GTR 0 ( SET "tCrumb=!wall!"
+IF !ud! NEQ 0 IF !rebuild! GTR 0 ( SET "tCrumb=!wall!"
 	SET "t1=!box%rebuild%!"
 	FOR /L %%A IN (0,1,15) DO IF "!t1:~%%A,1!" EQU "!tCrumb!" SET "tCrumb=!crumb!"
 )
@@ -1193,7 +1533,7 @@ FOR /L %%? IN (1,1,64) DO IF !curPos! NEQ !endPos! FOR /L %%@ IN (1,1,64) DO IF 
 	IF !trail! GTR !far! SET /A far=trail
 	SET /A curPos=newPos
 	SET "list=!newList!"
-	TITLE Maze#!mazeCnt!: !title0! !pct!%% nodes:!nodes!/!nCnt! trail:!trail! #!cnt!  %titleCS% %titleGK% !title1!
+	TITLE Maze#!mazeCnt! ^| !title0! ^| !pct!%% n:!nCnt!/!nodes! ^| #!cnt! trail:!trail! ^| %titleCS% %titleGK% ^| !title1! !TIME: =0!
 	IF !display! LSS 0 ( !clear!
 		ECHO(!mz!
 		%EKO%!msg:~1!
@@ -1223,8 +1563,9 @@ SET "mz=!mz:~0,%endPos%!!goal!!mz:~%e1%!"
 EXIT /B 0
 
 :mazing_dead_filler fillType
-REM %1=write what to maze? %1<0=walls, %1>=0=halls
-SET /A "dfMode=%~1, nodes=cols*rows, lbClr=nCnt=c1=t1=0, nTmp=cnt=trail=1, cTmp=wide-4, nChk=wide*2, sChk=size-wide*2, tf=0"
+REM %1<0=backfill empty halls with walls, %1>=0=clear crumbfill with empty halls
+REM %1 mod 3 0=straight sort, 1=reverse sort, 2=random sort
+SET /A "dfMode=%~1%%3, nodes=cols*rows, lbClr=nCnt=c1=t1=0, nTmp=cnt=trail=1, cTmp=wide-4, nChk=wide*2, sChk=size-wide*2"
 SET "r1= Dead Filler "
 SET "labelBtm=!r1:~0,%cTmp%!"
 SET "r1=!mz:~-%wide%!  !labelBtm!"
@@ -1233,8 +1574,7 @@ SET "mazeTop=!mz:~0,%wide%!"
 SET "mazeBtm=!r1:~0,%wide%!"
 SET "fix=!crumb!"
 SET "fill=!hall!"
-IF %~1 LSS 0 SET tf=1
-IF !tf! GTR 0 (
+IF %~1 LSS 0 (
 	IF "!wall!"=="ÿ" SET "wall=Û"
 	SET "fix=!hall!"
 	SET "fill=!wall!"
@@ -1252,13 +1592,38 @@ IF !display! NEQ 0 ( !clear!
 IF !display! GTR 0 CALL :mazing_BGcolor
 
 REM create stacks of cell positions for each row, omit start and end
-SET /A cp=np=t1=0, b1=bgnPos+1, e1=endPos+1, stl=cols*6
+TITLE Maze#!mazeCnt! ^| !title0! sorting nodes, please wait...
+SET /A cp=np=t1=0, b1=bgnPos+1, e1=endPos+1
 FOR /L %%A IN (0,1,16) DO ( SET "np%%A=" ) & ( SET "wp%%A=" )
-FOR /L %%A IN (1,1,%rows%) DO FOR /L %%B IN (1,1,%cols%) DO (
+REM dfMode straight sort
+IF !dfMode! EQU 0 FOR /L %%A IN (1,1,%rows%) DO FOR /L %%B IN (1,1,%cols%) DO (
 	SET /A "np=wide*%%A*2-wide+%%B*2-1, t1+=1"
 	IF !np! NEQ !bgnPos! IF !np! NEQ !endPos! (
 		IF !t1! LSS 1500 ( SET "rw0=!rw0!!np! "
 		) ELSE SET "rw1=!rw1!!np! "
+	)
+)
+REM reverse sort
+IF !dfMode:~-1! EQU 1 FOR /L %%A IN (1,1,%rows%) DO FOR /L %%B IN (1,1,%cols%) DO (
+	SET /A "np=wide*%%A*2-wide+%%B*2-1, t1+=1"
+	IF !np! NEQ !bgnPos! IF !np! NEQ !endPos! (
+		IF !t1! LSS 1500 ( SET "rw1= !np!!rw1!"
+		) ELSE SET "rw0= !np!!rw0!"
+	)
+)
+REM random sort
+IF !dfMode:~-1! EQU 2 (
+	FOR /L %%A IN (1,1,%rows%) DO FOR /L %%B IN (1,1,%cols%) DO (
+		SET /A "np=wide*%%A*2-wide+%%B*2-1, t1+=1"
+		IF !np! NEQ !bgnPos! IF !np! NEQ !endPos! SET df!t1!=!np!
+	)
+	FOR /L %%A IN (!t1!,-1,0) DO (
+		SET /A "rand=!RANDOM!%%(%%A+1), t1-=1"
+		SET /A "t2=df!rand!"
+		IF !t1! LSS 1500 ( SET "rw0=!rw0!!t2! "
+		) ELSE SET "rw1=!rw1!!t2! "
+		SET /A "df!rand!=df%%A"
+		SET "df%%A="
 	)
 )
 
@@ -1300,7 +1665,7 @@ FOR /L %%@ IN (1,1,64) DO IF DEFINED t1 ( SET "t1="
 				%EKO%!msg:~1!
 			)
 		)
-		TITLE Maze#!mazeCnt!: !title0! !pct!%% pass#%%@ nodes:!nodes!/!nCnt!/n!np! #!cnt!  %titleCS% %titleGK% !title1!
+		TITLE Maze#!mazeCnt! ^| !title0! ^| !pct!%% pass#%%@ loop#!cnt! ^| n:!nCnt!/!nodes!/n!np! ^| %titleCS% %titleGK% ^| !title1! !TIME: =0!
 	)
 )
 IF DEFINED t1 CALL :mazing_failure DeadFiller
@@ -1329,10 +1694,9 @@ SET "mz=!mz:~0,%endPos%!!goal!!mz:~%e1%!"
 EXIT /B 0
 
 :mazing_path_finder fillType
-REM %1=fill maze with what? %1<0=walls, %1>=0=crumbs
-REM    If %1 is odd, worms show the current stack.
-REM %2=length of worms, if there are any. limit is ~40
-SET /A "nodes=cols*rows, lbClr=chk=cnt=wormCnt=0, trail=nCnt=1, cTmp=wide-4, mode=%~1 %% 2"
+REM %1=length of worms (limit ~30) <0=walls, >0=crumbs, 0=random wall flood
+REM %1=odd=backfill/plug with walls (solids if rebuild GEQ 6 LEQ 10)
+SET /A "nodes=cols*rows, lbClr=chk=cnt=wormCnt=0, trail=nCnt=1, cTmp=wide-4, pfMode=%~1, lr=%~1%%2, rw=!RANDOM!%%wallCnt"
 SET "title0=Path Finder"
 SET "r1= Path Finder "
 SET "labelBtm=!r1:~0,%cTmp%!"
@@ -1344,15 +1708,18 @@ SET "mz=!mazeTop!!mz:~%wide%,-%wide%!!mazeBtm!"
 SET "bz=!mz!"
 SET "fill=!crumb!"
 SET "plug=!hall!"
-IF %~1 LSS 0 ( SET "fill=!wall!"
-) ELSE IF !rebuild! LSS 0 SET "plug=!wall!"
-IF "!fill!"=="ÿ" SET "fill=²"
+IF !pfMode! EQU 0 SET "fill=!walls:~%rw%,1!"
+IF !pfMode! LSS 0 SET "fill=!wall!" & SET /A "pfMode*=-1"
+REM IF !pfMode! LSS 0 IF !rebuild! GTR 0 SET "fill=!wall!"
+IF "!fill!"=="ÿ" SET "fill=°"
+IF !lr! NEQ 0 ( SET "plug=!wall!"
+	IF !rebuild! GEQ 1 IF !rebuild! LEQ 10 SET "plug=²")
 
 REM set display
 IF !display! NEQ 0 ( !clear!
 	ECHO(!mz!
 	%EKO%!msg:~1!
-) ELSE SET mode=0
+) ELSE SET pfMode=0
 IF !display! GTR 0 CALL :mazing_BGcolor
 
 SET "pf%bgnPos%=-1"
@@ -1383,14 +1750,14 @@ FOR /L %%? IN (1,1,64) DO IF NOT DEFINED pf%endPos% FOR /L %%@ IN (1,1,64) DO IF
 				)
 			)
 		)
-		TITLE Maze#!mazeCnt!: !title0! !pct!%% nodes:!nodes!/!nCnt! trail:!trail! #!cnt!  %titleCS% %titleGK% !title1!
+		TITLE Maze#!mazeCnt! ^| !title0! ^| !pct!%% n:!nCnt!/!nodes! ^| #!cnt! trail:!trail! ^| %titleCS% %titleGK% ^| !title1! !TIME: =0!
 	)
 	IF !display! LSS 0 ( !clear!
 		ECHO(!mz!
 		%EKO%!msg:~1!
 	)
-	IF !mode! NEQ 0 ( SET/A wormCnt+=1
-		IF !wormCnt! GTR %~2 FOR /F "tokens=1* delims=;" %%A IN ("!crmStk!") DO ( SET "crmStk=%%B"
+	IF !pfMode! NEQ 0 ( SET/A wormCnt+=1
+		IF !wormCnt! GTR !pfMode! FOR /F "tokens=1* delims=;" %%A IN ("!crmStk!") DO ( SET "crmStk=%%B"
 			FOR %%C IN (%%A) DO ( SET/A t1=%%C+1
 				FOR %%D IN (!t1!) DO SET "mz=!mz:~0,%%C!!plug!!mz:~%%D!"
 				IF !display! GTR 0 ( SET/A "r1=%%C/wide,c1=%%C-r1*wide
@@ -1436,7 +1803,6 @@ SET /A "cnt=trail=ep%bgnPos%=0"
 SET "stack=!bgnPos! "
 IF %1 EQU 0 SET title0=Inside
 IF %1 EQU 1 SET title0=Border
-SET "title2=!title1!"
 IF %1 GTR 1 ( SET /A "endPos%1=wide+1, r1=bgnPos/wide, c1=bgnPos-r1*wide"
 	IF !r1! LSS !rows! SET /A endPos%1=size-wide*2+1
 	IF !c1! LSS !cols! SET /A endPos%1+=wide-3
@@ -1461,7 +1827,7 @@ IF %1 GTR 1 ( SET /A "endPos%1=wide+1, r1=bgnPos/wide, c1=bgnPos-r1*wide"
 		)
 	)
 	SET /A trail+=1
-	TITLE Maze#!mazeCnt!: End Position !title0! / trail:!trail! #!cnt!  %titleCS% %titleGK% !title2!
+	TITLE Maze#!mazeCnt! ^| End Position:!title0! ^| !pct!%% #!cnt! trail:!trail! ^| %titleCS% %titleGK% ^| !title1! !TIME: =0!
 )
 SET "endPos=!endPos%1!"
 ENDLOCAL & SET /A "endPos=%endPos%, trail=%trail%, t1=endPos+1"
@@ -1526,10 +1892,10 @@ TITLE %~n0 initializing, please wait...
 ::::::::::::::::::::::::::
 :: Start User Variables ::
 ::::::::::::::::::::::::::
-SET "maxCols=120"               'maximum # of columns allowed in menu
+SET "maxCols=118"               'maximum # of columns allowed in menu
 SET "minCols=30"                'mainmum # of columns allowed in menu
-SET "maxRows=40"                'maximum # of rows allowed in menu
-SET "minRows=15"                'minimum # of rows allowed in menu
+SET "maxRows=38"                'maximum # of rows allowed in menu
+SET "minRows=14"                'minimum # of rows allowed in menu
 SET "maxSize=8186"              'maximum # of characters allowed in maze
 SET "minSize=1024"              'minimum # of characters allowed in maze
 SET "menuKeys=WSAD123H"         'up,down,left,right,continue+resume,quit+restart,abort+exit,help
@@ -1547,11 +1913,11 @@ REM default character strings for random generation
 REM these seem safe for non-legacy Win10 console
 SET "walls=##%%%%&&0889BDGMQQWYZ@@¬¬««²²ÛÛáãäèéï÷ÿÿ"
 SET "halls= "                      'space is the only hall character that seems to work well
-SET "crumbs=°°±±øúúþþx"            'chosen for being small and centered
+SET "crumbs=°°±±øúþþx"             'chosen for being small and centered
 SET "players=êŽS"             'chosen because they look like a player or entrance
 SET "goals=F$X¨û"               'chosen because they look like an exit or goal
-SET "backColors=078F"            'color list of hex numbers for random background selection
-SET "foreColors=1234569ABCDE"    'color list of hex numbers for random foreground selection
+SET "backColors=0123456"            'color list of hex numbers for random background selection
+SET "foreColors=789ABCDEF"    'color list of hex numbers for random foreground selection
 ::::::::::::::::::::::::
 :: End User Variables ::
 ::::::::::::::::::::::::
@@ -1564,7 +1930,7 @@ SET "cfgFile=%~n0.cfg"        'file for saving mzOp# values
 REM set code page, set constants
 MODE CON CP SELECT=437 >NUL%=       'IBM-PC codepage required for box characters, if no rebuild, ascii should be OK =%
 SET "display=-1"                    '0=no display/log only, -1=display, 1=display+color using BG.EXE
-SET "version=0.2"                   'current version # for Mazing.cmd
+SET "version=0.3"                   'current version # for Mazing.cmd
 SET "EKO=<NUL SET/P="               'display to screen without CR/LF, faster than the executables
 SET "clear=CLS"                     'will be replaced by BG or CursorPos if available
 SET "delay=0"                       'delay in centiseconds to slow process for viewing
@@ -1573,7 +1939,6 @@ SET "title1='%quitKey%' Quit/Menu"  'notice displayed at the end of TITLE
 SET "hex=0123456789ABCDEF"          'hexadecimal table for COLOR command
 SET "xWalls=#@Û"                    'walls used to display 'ÿ' (invisible wall)
 SET "mazingDebug=REM "              'clear or comment this to output SET.txt for each function
-SET "BGgrabKey=REM "                'used in place of BGgrabKey if inactive
 
 REM read character list from last line of Mazing.cmd or Mazing.bak.ini
 SET "t1=%~f0"
@@ -1590,7 +1955,7 @@ IF EXIST "%iniFile%" ( FOR /F "skip=2 tokens=1* delims=:=" %%A IN ('FIND /V ";" 
 	ECHO.
 	ECHO ; many of the characters below will not work in Win10 without 'properties/legacy console' mode enabled
 	ECHO ;walls="##%%%%&&0889BDGMQQWYZ@@¬¬««²²ÛÛáãäèéï÷ÿÿ"
-	ECHO ;crumbs="°°±±øúúþþx"
+	ECHO ;crumbs="°°±±øúþþx"
 	ECHO ;players="êŽS"
 	ECHO ;goals="?$X¨û"
 	ECHO ;numOfBoxes=12
@@ -1667,17 +2032,18 @@ SET mzMenu=  [$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$]  ^
   @ @   Node Selection %%Bias            :6:  @ @  ^
   @ @   Node Direction %%Bias            :7:  @ @  ^
   @ @   Rebuild Box                     :8:  @ @  ^
-  @ @   Wall Character                  :9:  @ @  ^
-  @ @   Crumb/Trail Character           :10:  @ @  ^
-  @ @   Start/Entrance Character        :11:  @ @  ^
-  @ @   Finish/Exit Character           :12:  @ @  ^
-  @ @   Background Color                :13:  @ @  ^
-  @ @   Foreground Color                :14:  @ @  ^
-  @ @   Background Color Shift          :15:  @ @  ^
-  @ @   Foreground Color Shift          :16:  @ @  ^
-  @ @   Foreground  B/W  Pulse          :17:  @ @  ^
-  @ @   Program Delay                   :18:  @ @  ^
-  @ @   Console Display Type            :19:  @ @  ^
+  @ @   Solver Display Settings         :9:  @ @  ^
+  @ @   Wall Character                  :10:  @ @  ^
+  @ @   Crumb/Trail Character           :11:  @ @  ^
+  @ @   Start/Entrance Character        :12:  @ @  ^
+  @ @   Finish/Exit Character           :13:  @ @  ^
+  @ @   Background Color                :14:  @ @  ^
+  @ @   Foreground Color                :15:  @ @  ^
+  @ @   Background Color Shift          :16:  @ @  ^
+  @ @   Foreground Color Shift          :17:  @ @  ^
+  @ @   Foreground  B/W  Pulse          :18:  @ @  ^
+  @ @   Program Delay                   :19:  @ @  ^
+  @ @   Console Display Type            :20:  @ @  ^
   @ @                                                  @ @  ^
   @ @  :A:=  :B:=   :C:=Resume/Restart/Exit  :D:=Help  @ @  ^
   @ {$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$} @  ^
@@ -1689,21 +2055,23 @@ SET mzMenu=  [$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$]  ^
 REM mWide,mHigh=menu WxH, opCnt=#of menu items-1, opSize=length of option text, orgPos=default position in menu, mt#=mazingTemp variables
 REM opSize=string length of menu items to be injected into %mzMenu%, orgPos=position in %mzMenu% for 1st menu item
 REM mzOp#P#=menu position for option titles, for retitling options
-SET /A mWide=60,mHigh=35,mSize=mWide*mHigh,opCnt=19,opSize=13,orgPos=400,mt0=mt1=mt2=mt3=mt4=-1,mt5=mCh=bgCnt=csTrg=csCnt=pCnt=gkCnt=gkTrg=mazeCnt=totalCnt=loopCnt=fstClr=0
-SET /A mzOp5P1=mzOp5P2=668,mzOp5P2+=28,mzOp6P1=mzOp6P2=728,mzOp6P2+=28,mzOp8P1=mzOp8P2=860,mzOp8P2+=15,msgP1=msgP2=1805,msgP2+=50
+SET /A mWide=60,mHigh=36,mSize=mWide*mHigh,opSize=13,orgPos=400,mt0=mt1=mt2=mt3=mt4=mt5=-1,opCnt=mCh=csTrg=csCnt=pCnt=gkCnt=gkTrg=mazeCnt=totalCnt=loopCnt=fstClr=0
+SET /A mzOp5P1=mzOp5P2=668,mzOp5P2+=28,mzOp6P1=mzOp6P2=728,mzOp6P2+=28,mzOp8P1=mzOp8P2=860,mzOp8P2+=15,mzOp9P1=mzOp9P2=908,mzOp9P2+=28,msgP1=msgP2=1865,msgP2+=50
 
 REM load arrays for menu display, user variables, and maximum size for menuOps
-FOR %%A IN ("Random" "BackTracker" "Hunt & Kill" "Growing Tree" "Itr. Division" "Eller's Algor") DO SET "mzOp0[!mt0!]=%%~A" & SET /A mt0+=1
+FOR %%A IN ("Random" "BackTracker" "Hunt & Kill" "Growing Tree" "Wall Division" "Eller's Algor" "Prim's Algor" "Kruskal Algor" "Wilsons Algor") DO SET "mzOp0[!mt0!]=%%~A" & SET /A mt0+=1
 FOR %%A IN ("Random" "Solve Off" "Wall Follow" "Dead Filler" "Path Finder") DO SET "mzOp1[!mt1!]=%%~A" & SET /A mt1+=1
 FOR %%A IN (Random Inside Border Corner) DO FOR %%B IN (Random Inside Border Corner) DO SET "mzOp2[!mt2!]=%%B/%%A" & SET /A mt2+=1
-FOR %%A IN ("Stack Size/Type/Wall Setting" "Unused by BackTracker       " "Stack Type LIFO/FIFO        " "Stack Type + List Size      " "Placement of Wall Openings  " "Unused by Eller's Algorithm ") DO SET "mzOp5[!mt3!]=%%~A" & SET /A mt3+=1
-FOR %%A IN ("Node Selection %%Bias        " "Unused by BackTracker       " "Node Selection %%Bias        " "Node Selection %%Bias        " "Order of Iterative Stack    " "Unused by Eller's Algorithm ") DO SET "mzOp6[!mt4!]=%%~A" & SET /A mt4+=1
-FOR %%A IN (4 3 14 !maxCols! !maxRows! 24 101 100 !nobRW! !charCnt! !charCnt! !charCnt! !charCnt! 16 16 6000 6000 40 101 1) DO SET /A maxOp!mt5!=%%A,mt5+=1
+FOR %%A IN ("Stack Size/Type/Wall Setting" "Unused by BackTracker       " "Stack Type LIFO/FIFO        " "Stack Type + List Size      " "Placement of Wall Openings  " "Unused by Eller's Algorithm " "Unused by Prim's Algorithm  "  "Unused by Kruskals Algorithm" "Crumb/Maze Display Settings ") DO SET "mzOp5[!mt3!]=%%~A" & SET /A mt3+=1
+FOR %%A IN ("Node Selection %%Bias        " "Unused by BackTracker       " "Node Selection %%Bias        " "Node Selection %%Bias        " "Order of Iterative Stack    " "Unused by Eller's Algorithm " "Unused by Prim's Algorithm  " "Unused by Kruskals Algorithm" "Unused by Wilson's Algorithm") DO SET "mzOp6[!mt4!]=%%~A" & SET /A mt4+=1
+FOR %%A IN ("Solver Display Settings     " "Solvers Currently Inactive  " "<0=BackFill odd=Wall Crumbs " "<0=BackFill >0=Crumb Clear  " "<0=Walls >0=Crumbs 0=Flood  ") DO SET "mzOp9[!mt5!]=%%~A" & SET /A mt5+=1
+FOR %%A IN (7 3 14 !maxCols! !maxRows! 24 101 100 !nobRW! 60 !charCnt! !charCnt! !charCnt! !charCnt! 16 16 6000 6000 40 101 1) DO SET /A maxOp!opCnt!=%%A,opCnt+=1
+SET /A opCnt-=1
 FOR /L %%A IN (0,1,%opCnt%) DO SET mzOp%%A=-1& SET "mView%%A=Random       "%= 'mzOp#=menu values, mView#=menu option display, -1=Random =%
 SET "mView2=Random/Random"
-SET "mView18=Delay Off    "
-SET "mView19=16 Color     "
-SET "mzOp18=0"
+SET "mView19=Delay Off    "
+SET "mView20=16 Color     "
+SET "mzOp19=0"
 SET mt3=
 REM messages shown at the bottom of the menu for each option chosen
 SET "mMsg0=generate perfect maze with 1 path for any 2 points"
@@ -1715,30 +2083,45 @@ SET "mMsg5= stack/wall setting, different for each generator "
 SET "mMsg6=    0=always random, 50=even, 100=always stack    "
 SET "mMsg7=  0=most vertical, 50=even, 100=most horizontal   "
 SET "mMsg8= rebuild single character maze to box characters  "
-SET "mMsg9=        single character to use for walls         "
-SET "mMsg10=     single character to use for crumbs/trail     "
-SET "mMsg11=    single character to use for start/entrance    "
-SET "mMsg12=     single character to use for finish/exit      "
-SET "mMsg13=   hexadecimal background color, remains static   "
-SET "mMsg14=   hexadecimal foreground color, remains static   "
-SET "mMsg15=     time interval for background color shift     "
-SET "mMsg16=     time interval for foreground color shift     "
-SET "mMsg17=      time interval for B/W foreground pulse      "
-SET "mMsg18=   # of centisecond to delay for better viewing   "
-SET "mMsg19=   native 16 color, BG.EXE color, or no display   "
+SET "mMsg9= display settings for solvers, different for each "
+SET "mMsg10=        single character to use for walls         "
+SET "mMsg11=     single character to use for crumbs/trail     "
+SET "mMsg12=    single character to use for start/entrance    "
+SET "mMsg13=     single character to use for finish/exit      "
+SET "mMsg14=   hexadecimal background color, remains static   "
+SET "mMsg15=   hexadecimal foreground color, remains static   "
+SET "mMsg16=     time interval for background color shift     "
+SET "mMsg17=     time interval for foreground color shift     "
+SET "mMsg18=      time interval for B/W foreground pulse      "
+SET "mMsg19=   # of centisecond to delay for better viewing   "
+SET "mMsg20=   native 16 color, BG.EXE color, or no display   "
+
 REM arrays to allow multiple messages for any option, keyed to mzOp#
 SET "mMsg5[-1]=%mMsg5%"
 SET "mMsg5[0]=  setting is not used by Depth-First BackTracker  "
-SET "mMsg5[1]=    stack direction setting 0=FIFO, not 0=LIFO    "
+SET "mMsg5[1]=    stack direction setting <0=FIFO, else LIFO    "
 SET "mMsg5[2]=   list size+direction 0=all, >0=LIFO, <0=FIFO    "
 SET "mMsg5[3]=wall open 0=NW, 1=SE, 2=NW/SE, 3=center, 4+=random"
 SET "mMsg5[4]=     setting is not used by Eller's Algorithm     "
+SET "mMsg5[5]=     setting is not used by Prim's Algorithm      "
+SET "mMsg5[6]=    setting is not used by Kruskal's Algorithm    "
+SET "mMsg5[7]= odd=altCrumbs mod3=all crumbs/halls <0=crumbMaze "
+
 SET "mMsg6[-1]=%mMsg6%"
 SET "mMsg6[0]=%mMsg5[0]%"
 SET "mMsg6[1]=%mMsg6%"
 SET "mMsg6[2]=%mMsg6%"
 SET "mMsg6[3]=    stack order 0-7=static pre-sets, 8+=random    "
 SET "mMsg6[4]=%mMsg5[4]%"
+SET "mMsg6[5]=%mMsg5[5]%"
+SET "mMsg6[6]=%mMsg5[6]%"
+SET "mMsg6[7]=    setting is not used by Wilson's Algorithm     "
+
+SET "mMsg9[-1]=%mMsg9%"
+SET "mMsg9[0]=        all solvers are currently inactive        "
+SET "mMsg9[1]=  <0=backfill with walls odd=use walls as crumbs  "
+SET "mMsg9[2]= <0=backfill >0=crumb clear mod3=sorting options  "
+SET "mMsg9[3]= wormSize <0=walls >0=crumbs 0=flood odd=backfill "
 
 REM run config file as batch file or set firstRun
 IF EXIST "!cfgFile!" ( COPY /Y "!cfgFile!" "!cfgFile!.cmd" >NUL
@@ -1764,13 +2147,13 @@ SET colorShift=IF ^^^!csCnt^^^! LSS ^^^!csTrg^^^! (SET/A csCnt+=1%\n%
 		IF ^^^!csBtm^^^! GTR 0 (IF NOT DEFINED BGstart SET/A BGstart=BGend=BGtime,BGend+=csBtm%\n%
 			IF ^^^!BGtime^^^! LSS ^^^!BGstart^^^! SET/A BGtime+=8640000%\n%
 			IF ^^^!BGtime^^^! GEQ ^^^!BGend^^^! (SET BGstart=%\n%
-				IF ^^^!mzOp13^^^! EQU 16 IF ^^^!fgClr^^^! LEQ 7 (IF ^^^!bgr^^^! LEQ 7 SET/A bgr+=8)ELSE IF ^^^!bgr^^^! GEQ 8 SET/A bgr-=8%\n%
+				IF ^^^!mzOp14^^^! EQU 16 IF ^^^!fgClr^^^! LEQ 7 (IF ^^^!bgr^^^! LEQ 7 SET/A bgr+=8)ELSE IF ^^^!bgr^^^! GEQ 8 SET/A bgr-=8%\n%
 				FOR %%X IN (^^^!bgr^^^!)DO SET bgClr=^^^!bColors:~%%X,1^^^!%\n%
 				SET bgr=-1))%\n%
 		IF ^^^!csFtm^^^! GTR 0 (IF NOT DEFINED FGstart SET/A FGstart=FGend=FGtime,FGend+=csFtm%\n%
 			IF ^^^!FGtime^^^! LSS ^^^!FGstart^^^! SET/A FGtime+=8640000%\n%
 			IF ^^^!FGtime^^^! GEQ ^^^!FGend^^^! (SET FGstart=%\n%
-				IF ^^^!mzOp13^^^! EQU 16 IF ^^^!yn^^^! NEQ 0 IF ^^^!bgClr^^^! LEQ 7 (IF ^^^!fgr^^^! LEQ 7 SET/A fgr+=8)ELSE IF ^^^!fgr^^^! GEQ 8 SET/A fgr-=8%\n%
+				IF ^^^!mzOp14^^^! EQU 16 IF ^^^!yn^^^! NEQ 0 IF ^^^!bgClr^^^! LEQ 7 (IF ^^^!fgr^^^! LEQ 7 SET/A fgr+=8)ELSE IF ^^^!fgr^^^! GEQ 8 SET/A fgr-=8%\n%
 				FOR %%X IN (^^^!fgr^^^!)DO SET fgClr=^^^!fColors:~%%X,1^^^!%\n%
 				SET bgr=-1))%\n%
 		IF ^^^!pulse^^^! GTR 0 (IF ^^^!pCnt^^^! EQU ^^^!pulse^^^! (SET bgr=0%\n%
@@ -1839,6 +2222,15 @@ FOR %%x IN (" =32" "!=33" ""=34" "#=35" "$=36" "%%=37" "^&=38" "'=39"
 )
 EXIT /B 256
 
+:mazing_wait centiseconds
+REM high CPU load, only suitable for very short delays
+FOR /F "tokens=1-4 delims=:." %%W IN ("%TIME: =0%") DO SET/A "waitTime=(((1%%W*60)+1%%X)*60+1%%Y)*100+1%%Z-36610100"
+IF NOT DEFINED waitStart SET/A waitStart=waitEnd=waitTime,waitEnd+=%~1-1
+IF %waitTime% LSS %waitStart% SET /A waitTime+=8640000
+IF %waitTime% LSS %waitEnd% GOTO :mazing_wait
+SET waitStart=
+EXIT /B 0
+
 :mazing_failure
 ECHO(%1 with Maze#%mazeCnt% at %TIME: =0% on %DATE% >>"%~f0.Failure.txt"
 SET>>"%~f0.Failure.txt"
@@ -1864,99 +2256,99 @@ FOR /F "tokens=3-12" %%A IN ('Expand') DO (
 
 -----BEGIN CERTIFICATE-----
 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
-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
+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
 -----END CERTIFICATE-----
 
 BG v3.9 se (unicode)

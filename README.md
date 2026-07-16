@@ -100,4 +100,4 @@
      If using Windows 10+ enable 'properties/legacy console'
     
     
-    project by CirothUngol                  v0.3 July 11, 2026
+    project by CirothUngol                  v0.3 July 15, 2026

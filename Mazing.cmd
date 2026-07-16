@@ -99,7 +99,7 @@
 ::  If using Windows 10+ enable 'properties/legacy console'
 :: 
 :: 
-:: project by CirothUngol                  v0.3 July 11, 2026
+:: project by CirothUngol                  v0.3 July 15, 2026
 ::
 :: Added Prim's, Kruskal's, and Wilson's Algorithms as generators.
 :: Added menu option for solvers with lots of new display stuff.
@@ -287,8 +287,8 @@ SET "tMenu="
 
 REM save menu configuration and check for exit
 >"!cfgFile!" ECHO REM %~nx0 v%version% runs as batch file at end of :mazing_init
->>"!cfgFile!" ECHO SET saveCh=!mCh!
 FOR /L %%A IN (0,1,%opCnt%) DO >>"!cfgFile!" ECHO SET mzOp%%A=!mzOp%%A!
+>>"!cfgFile!" ECHO SET saveCh=!mCh!
 
 REM check for new settings
 SET "BGstart=" & SET "FGstart=" & SET /A csCnt=pCnt=0
@@ -583,7 +583,7 @@ ENDLOCAL
 EXIT /B 0
 
 :mazing_hunt_kill stackType rsBias hvBias
-REM %1=stack direction. <0=FIFO, else=LIFO mod5=display all crumbs in trail
+REM %1=stack direction. <0=FIFO, else=LIFO
 REM %2=next node bias. 0=always random, 100=always stack, >100=oldest/newest
 REM %3=directional bias. 1=most vertical, 99=most horizontal
 REM If %1<>0 and %2=100 then algorithm is Depth-First BackTracker.
@@ -618,8 +618,6 @@ SET "mz=!mz:~0,%curPos%!!player!!mz:~%t1%!"
 SET "r1=!wall!!wall!!labelTop!!top!"
 SET "mazeTop=!r1:~0,%wide%!"
 SET "mz=!mazeTop!!mz:~%wide%!"
-SET "tHall=!hall!"
-IF !ud! EQU 0 SET "tHall=!crumb!"
 
 REM set display
 IF !display! NEQ 0 (!clear!
@@ -664,10 +662,10 @@ FOR /L %%? IN (1,1,64) DO IF !nCnt! LSS !nodes! FOR /L %%@ IN (1,1,64) DO IF !nC
 			SET "stack=!stack!!cp:~-4! "
 		) ELSE SET "stack= !cp:~-4!!stack!"%= 'else it's LIFO, so place on top instead =%
 		FOR /F "tokens=1-4" %%A IN ("!mw! !mTmp! !newPos! !nTmp!") DO (
-			SET "mz=!mz:~0,%%A!!tHall!!mz:~%%B!"%= 'replace walls with hall+crumb characters in the newPositions =%
+			SET "mz=!mz:~0,%%A!!hall!!mz:~%%B!"%= 'replace walls with hall+crumb characters in the newPositions =%
 			SET "mz=!mz:~0,%%C!!crumb!!mz:~%%D!"
 			IF !display! GTR 0 ( SET /A "r1=%%A/wide, c1=%%A-r1*wide, r2=%%C/wide, c2=%%C-r2*wide"
-				BG.EXE FCPrint !r1! !c1! !bgClr!!exClr! "!tHall!"
+				BG.EXE FCPrint !r1! !c1! !bgClr!!exClr! "!hall!"
 				BG.EXE FCPrint !r2! !c2! !bgClr!!exClr! "!crumb!"
 			)
 		)
@@ -690,7 +688,7 @@ FOR /L %%? IN (1,1,64) DO IF !nCnt! LSS !nodes! FOR /L %%@ IN (1,1,64) DO IF !nC
 		%EKO%!msg:~1!
 	)%=    'check for user menu, animate by clearing and EKOing maze =%
 	IF !trail! GTR !far! SET /A far=trail%= 'set highest stack count =%
-	TITLE Maze#!mazeCnt! ^| !title0! ^| !pct!%% n:!nCnt!/!nodes! ^| #!cnt! top:!far!/!trail! ^| %titleCS% %titleGK% ^| !title1! !TIME: =0!
+	TITLE Maze#!mazeCnt! ^| !title0! ^| !pct!%% n:!nodes!/!nCnt! ^| #!cnt! top:!far!/!trail! ^| %titleCS% %titleGK% ^| !title1! !TIME: =0!
 	SET /A curPos=newPos%=      'rCnt=0 means no new direction found, so clear currentPosition to force new position from stack =%
 	IF !rCnt! EQU 0 SET curPos=
 )
@@ -720,10 +718,10 @@ IF %~1 EQU 0 ( SET "msg= LIFO list=all"
 	IF %~2 EQU 0 SET "msg= list=all"
 ) ELSE IF %~1 GTR 0 ( SET "msg= LIFO list=!lst!"
 ) ELSE SET "msg= FIFO list=!lst!"
-IF %~2 LSS 1 ( SET "msg=!msg!:random=always:list=never"
-) ELSE IF %~2 EQU 100 ( SET "msg=!msg!:random=never:list=always"
-) ELSE IF %~2 GTR 100 ( SET "msg=!msg!:random=never:list=old/new"
-) ELSE SET "msg=!msg!:random=!d1!%%:list=%~2%%"
+IF %~2 LSS 1 ( SET "msg=!msg!:random=always:stack=never"
+) ELSE IF %~2 EQU 100 ( SET "msg=!msg!:random=never:stack=always"
+) ELSE IF %~2 GTR 100 ( SET "msg=!msg!:random=never:stack=old/new"
+) ELSE SET "msg=!msg!:random=!d1!%%:stack=%~2%%"
 SET "msg=!msg!:vrt=!vBias!%%:hrz=!hBias!%%"
 SET "labelTop= %title0% %cols%x%rows% "
 SET "mm=!msg:~1!"
@@ -815,7 +813,7 @@ FOR /L %%? IN (1,1,64) DO IF !nCnt! LSS !nodes! FOR /L %%@ IN (1,1,64) DO IF !nC
 		%EKO%!msg:~1!
 	)
 	IF !trail! GTR !far! SET "far=!trail!"
-	TITLE Maze#!mazeCnt! ^| !title0! ^| !pct!%% n:!nCnt!/!nodes! ^| #!cnt! top:!far!/!trail! ^| %titleCS% %titleGK% ^| !title1! !TIME: =0!
+	TITLE Maze#!mazeCnt! ^| !title0! ^| !pct!%% n:!nodes!/!nCnt! ^| #!cnt! top:!far!/!trail! ^| %titleCS% %titleGK% ^| !title1! !TIME: =0!
 )
 REM clear crumbs and exit
 SET "mz=!mz:%crumb%=%hall%!"
@@ -952,7 +950,7 @@ FOR /L %%? IN (1,1,64) DO IF DEFINED stack FOR /L %%@ IN (1,1,64) DO IF DEFINED 
 		ECHO(!mz!
 		%EKO%!msg:~1!
 	)
-	IF !nCnt! LEQ !block! TITLE Maze#!mazeCnt! ^| !title0! ^| !pct!%% #!cnt! block:!nCnt!/!block! ^| %titleCS% %titleGK% ^| !title1! !TIME: =0!
+	IF !nCnt! LEQ !block! TITLE Maze#!mazeCnt! ^| !title0! ^| !pct!%% #!cnt! block:!block!/!nCnt! ^| %titleCS% %titleGK% ^| !title1! !TIME: =0!
 )
 TITLE Maze#!mazeCnt! ^| !title0! ^| 100%% #!cnt! block:!block!/!block! ^| %titleCS% %titleGK% ^| !title1! !TIME: =0!
 SET "mz=!mz:%crumb%=%hall%!"
@@ -1104,18 +1102,19 @@ IF NOT EXIST %~n0.uMerge.cmd (
 
 REM build wall list and disjoint set for :unionMerge
 FOR /L %%A IN (1,1,%rows%) DO (
-	TITLE Maze#!mazeCnt! ^| !title0! sorting walls ^| row# %%A of %rows% ^| vw:!vwCnt! hw:!hwCnt! %titleCS% %titleGK% !title1! !TIME: =0!
+	TITLE Maze#!mazeCnt! ^| !title0! sorting walls ^| row# %%A of %rows% ^| vw:!vwCnt! hw:!hwCnt! ^| %titleCS% %titleGK% ^| !title1! !TIME: =0!
+	%BGgrabKey%
+	IF NOT EXIST "%keyFile%" CALL :mazing_menu
+	IF ERRORLEVEL 2 EXIT /B !ERRORLEVEL!
+	%colorShift%
 	FOR /L %%B IN (1,1,%cols%) DO (
-		%BGgrabKey%
-		IF NOT EXIST "%keyFile%" CALL :mazing_menu
-		IF ERRORLEVEL 2 EXIT /B !ERRORLEVEL!
-		%colorShift%
 		SET /A "np=wide*%%A*2-wide+%%B*2-1,vp=np+2,hp=np+wide*2,vChk=wide*%%A*2"
 		IF !vp! LSS !vChk! SET /A "vn!vwCnt!=np,vw!vwCnt!=np+1,vp!vwCnt!=vp,vwCnt+=1"
 		IF !hp! LSS !size! SET /A "hn!hwCnt!=np,hw!hwCnt!=np+wide,hp!hwCnt!=hp,hwCnt+=1"
 		SET "ka!np!=!np!"
 	)
 )
+SET "BGstart=" & SET "FGstart=" & SET /A csCnt=csTrg=pCnt=0
 
 REM loop through #walls, select from V/H wallLists, uMerge positions, and carve new openings
 SET /A "numWalls=cols*rows*2-cols-rows-1,numNodes=cols*rows"
@@ -1163,7 +1162,7 @@ FOR /L %%@ IN (!numWalls!,-1,0) DO (
 			BG.EXE FCPrint !r3! !c3! !bgClr!!exClr! "!hall!"
 		)
 	)
-	TITLE Maze#!mazeCnt! ^| !title0! ^| !pctN!%% n:!tn! ^| !pctW!%% w:%%@ ^| vw:!vwCnt! hw:!hwCnt! %titleCS% %titleGK% ^| !title1! !TIME: =0!
+	TITLE Maze#!mazeCnt! ^| !title0! ^| !pctN!%% n:!numNodes!/!tn! ^| !pctW!%% w:%%@ ^| vw:!vwCnt! hw:!hwCnt! ^| %titleCS% %titleGK% ^| !title1! !TIME: =0!
 )
 REM clear crumbs and variables then exit
 FOR /F "delims==" %%A IN ('SET ka') DO SET %%A=
@@ -1184,7 +1183,7 @@ REM %1 number of additional entry points, maze=crumbs if negative
 REM %1 odd=reverse crumbs+halls in walk / don't show loop animation
 REM %1 mod3 0=crumb+hall / 1=all crumbs / 2=all halls
 REM %2=directional bias. 1=most vertical, 99=most horizontal
-SET /A "addEntry=%~1,lr=%~1%%2,uds=%~1%%3,vBias=100-%~2,hBias=%~2,numNodes=nCnt=cols*rows,curPos=bt=bgnPos,bgCnt=pct=cnt=t1=t2=t3=0,t4=wide-4,nCnt-=1,bt+=1"
+SET /A "addEntry=%~1,lr=%~1%%2,uds=%~1%%3,vBias=100-%~2,hBias=%~2,numNodes=cols*rows,curPos=bt=bgnPos,waStop=bgCnt=nCnt=pct=cnt=t1=t2=t3=0,rWalk=1,t4=wide-4,bt+=1"
 IF %~1 LSS 0  SET /A addEntry*=-1
 IF %~2 LSS 1  SET /A vBias=99,hBias=1
 IF %~2 GTR 99 SET /A vBias=1,hBias=99
@@ -1226,22 +1225,29 @@ IF !uds! EQU 2 IF "!wall!" NEQ "ÿ" SET "tHall=!hall!" & SET "tCrumb=!hall!"
 IF "!wall!" EQU "ÿ" SET "tMaze=!crumb!"
 
 REM build node list for random entry
-TITLE Maze#!mazeCnt! ^| !title0! sorting nodes, please wait...
+TITLE Maze#!mazeCnt! ^| !title0! sorting nodes, please wait...  !TIME: =0!
 FOR /L %%A IN (1,1,%rows%) DO FOR /L %%B IN (1,1,%cols%) DO (
 	SET /A np=wide*%%A*2-wide+%%B*2-1
-	SET mz_!np!=0
+	SET /A mz_!np!=nCnt,rn_!nCnt!=np,nCnt+=1
 )
+
+REM set beginPosition as first currentPosition
+SET /A nCnt-=1
+SET /A t1=rn_!mz_%bgnPos%!=rn_!nCnt!,walk!bgnPos!=rWalk
+SET /A mz_!t1!=!mz_%bgnPos%!
+SET "mz_!bgnPos!="
+SET "rn_!nCnt!="
+
 REM create random entry point(s)
-SET "mz_!bgnPos!="    'mark start position as visited
-SET "walk!bgnPos!=1"  'and set it as start of random walk
-SET /A "t0=(addEntry+1)*2"
-FOR /L %%A IN (0,1,!t0!) DO IF !t3! LEQ !addEntry! (
-	SET /A "t1=t2=(!RANDOM!%%cols*2+1)+(!RANDOM!%%rows*2+1)*wide,t2+=1"
-	IF DEFINED mz_!t1! FOR /F "tokens=1,2" %%B IN ("!t1! !t2!") DO (
+FOR /L %%A IN (0,1,!addEntry!) DO (
+	SET /A tr=!RANDOM!%%nCnt,nCnt-=1
+	SET /A t1=t2=rn_!tr!,t3=rn_!tr!=rn_!nCnt!,t2+=1
+	SET  "mz_!t3!=!tr!"
+	FOR %%B IN (!t1!) DO FOR %%C IN (!t2!) DO (
 		SET "mz=!mz:~0,%%B!!tMaze!!mz:~%%C!"
-		SET "ae_!t3!=%%B %%C"
+		SET "ae_%%A=%%B %%C"
+		SET "rn_!nCnt!="
 		SET "mz_%%B="
-		SET /A t3+=1
 	)
 )
 
@@ -1256,7 +1262,7 @@ FOR %%A IN (n s e w) DO SET "%%ABias=%%A"%=                                  'st
 FOR /L %%A IN (2,1,!hBias!) DO SET "eBias=!eBias!e" & SET "wBias=!wBias!w"%= 'stack characters to represent percentage =%
 FOR /L %%A IN (2,1,!vBias!) DO SET "nBias=!nBias!n" & SET "sBias=!sBias!s"%= 'chance to select each direction =%
 
-FOR /L %%? IN (1,1,1024) DO IF !nCnt! GTR 0 FOR /L %%@ IN (1,1,1024) DO IF !nCnt! GTR 0 (
+FOR /L %%? IN (1,1,1024) DO IF DEFINED waStop FOR /L %%@ IN (1,1,1024) DO IF DEFINED waStop (
 	%mazingDebug% SET>%~f0.debug.Wilsons.txt
 	%BGgrabKey%
 	IF NOT EXIST "%keyFile%" CALL :mazing_menu
@@ -1264,21 +1270,20 @@ FOR /L %%? IN (1,1,1024) DO IF !nCnt! GTR 0 FOR /L %%@ IN (1,1,1024) DO IF !nCnt
 	IF !delay! GTR 0 CALL :mazing_wait !delay!
 	%colorShift%
 	IF !curPos! EQU 0 ( REM start new random walk
-		SET /A t1=!RANDOM!%%nCnt,t2=-1,rWalk=1
-		IF !nCnt! GTR 1000 IF !cnt! GTR !bgCnt! TITLE Maze#!mazeCnt! ^| !title0! ^| !pct!%% n:!numNodes!/!nCnt! ^| #!t1! selecting node, please wait...
-		SET /A bgCnt=cnt+8
-		FOR /F "delims=mz_=" %%A IN ('SET mz_') DO ( REM get list of unvisited cells
-			SET /A t2+=1,t3=%%A+1
-			IF !t1! EQU !t2! FOR %%B IN (!t3!) DO ( REM select one at random
-				SET "mz=!mz:~0,%%A!!tCrumb!!mz:~%%B!"
-				SET /A curPos=%%A,walk%%A=rWalk
-				SET "mz_%%A="
-				IF !display! GTR 0 ( SET /A r1=%%A/wide,c1=%%A-r1*wide
-					BG.EXE FCPrint !r1! !c1! !bgClr!!pClr! "!tCrumb!"
-				)
+		SET /A tr=!RANDOM!%%nCnt,nCnt-=1,rWalk=1,bgCnt=cnt+8
+		SET /A t1=t2=rn_!tr!,t3=rn_!tr!=rn_!nCnt!,t2+=1
+		SET "mz_!t3!=!tr!"
+		FOR %%A IN (!t1!) DO FOR %%B IN (!t2!) DO (
+			SET "mz=!mz:~0,%%A!!tCrumb!!mz:~%%B!"
+			SET /A curPos=%%A,walk%%A=rWalk
+			SET "rn_!nCnt!="
+			SET "mz_%%A="
+			IF !display! GTR 0 ( SET /A r1=%%A/wide,c1=%%A-r1*wide
+				BG.EXE FCPrint !r1! !c1! !bgClr!!pClr! "!tCrumb!"
 			)
 		)
 	)
+
 	REM calculate positions and build directional bias list
 	SET "rBias="
 	SET /A "np=curPos-wide*2,sp=curPos+wide*2,ep=curPos+2,wp=curPos-2,nw=curPos-wide,sw=curPos+wide,ew=curPos+1,ww=curPos-1,wChk=curPos/wide*wide,eChk=wChk+wide,rCnt=0,cnt+=1"
@@ -1297,6 +1302,8 @@ FOR /L %%? IN (1,1,1024) DO IF !nCnt! GTR 0 FOR /L %%@ IN (1,1,1024) DO IF !nCnt
 			SET "mz=!mz:~0,%%C!!tCrumb!!mz:~%%D!"
 			SET "step!rWalk!=%%A %%B %%C %%D"
 			SET /A walk%%C=rWalk+=1,curPos=newPos,nCnt-=1
+			SET /A t3=rn_!mz_%%C!=rn_!nCnt!
+			SET "mz_!t3!=!mz_%%C!"
 			SET "mz_%%C="
 			IF !display! GTR 0 ( SET /A r1=%%A/wide,c1=%%A-r1*wide,r2=%%C/wide,c2=%%C-r2*wide
 				BG.EXE FCPrint !r1! !c1! !bgClr!!pClr! "!tHall!"
@@ -1309,7 +1316,7 @@ FOR /L %%? IN (1,1,1024) DO IF !nCnt! GTR 0 FOR /L %%@ IN (1,1,1024) DO IF !nCnt
 		FOR /L %%A IN (!rWalk!,1,!loopEnd!) DO FOR /F "tokens=1-4" %%B IN ("!step%%A!") DO (
 			SET "mz=!mz:~0,%%B!!wall!!mz:~%%C!"
 			SET "mz=!mz:~0,%%D!!wall!!mz:~%%E!"
-			SET /A mz_%%D=0,nCnt+=1
+			SET /A mz_%%D=nCnt,rn_!nCnt!=%%D,nCnt+=1
 			SET "step%%A="
 			SET "walk%%D="
 			IF !display! LSS 0 IF !lr! EQU 0 ( !clear!
@@ -1326,7 +1333,7 @@ FOR /L %%? IN (1,1,1024) DO IF !nCnt! GTR 0 FOR /L %%@ IN (1,1,1024) DO IF !nCnt
 		IF DEFINED ae_0 FOR /L %%A IN (0,1,!addEntry!) DO (
 			FOR /F "tokens=1,2" %%B IN ("!ae_%%A!") DO IF %%B NEQ !newPos! (
 				SET "mz=!mz:~0,%%B!!wall!!mz:~%%C!"
-				SET "mz_%%B=0"
+				SET /A mz_%%B=nCnt,rn_!nCnt!=%%B,nCnt+=1
 			)
 			SET "ae_%%A="
 		)
@@ -1337,7 +1344,8 @@ FOR /L %%? IN (1,1,1024) DO IF !nCnt! GTR 0 FOR /L %%@ IN (1,1,1024) DO IF !nCnt
 			SET "mz=!mz:%tHall%=%tMaze%!"
 		) ELSE IF "!tMaze!" NEQ "!tCrumb!" SET "mz=!mz:%tCrumb%=%tMaze%!"
 		IF "!tMaze!" NEQ "!hall!" SET "mz=!mazeTop!!mz:~%wide%!"
-		SET /A curPos=0,nCnt-=1
+		IF !nCnt! EQU 0 SET "waStop="
+		SET "curPos=0"
 		IF !display! GTR 0 ( !clear!
 			ECHO(!mz!
 			%EKO%!msg:~1!
@@ -1365,7 +1373,7 @@ IF %mzOp14% GTR 15 SET "bgClr=!bColors:~%t1%,1!"
 IF %mzOp15% LSS 0  SET "fgClr=!fColors:~%t2%,1!"
 IF %mzOp15% GTR 15 SET "fgClr=!fColors:~%t2%,1!"
 SET "mTmp=!walls:~%t3%,1!"
-SET "title0=Rebuilding Box#%~1"
+SET "title0=Rebuild: Box#%~1"
 
 REM change color and wall character and exit
 IF %~1 LSS 0 (
@@ -1399,7 +1407,7 @@ FOR /L %%? IN (0,%wide%,%size%) DO IF %%? LSS %size% (
 	IF NOT EXIST "%keyFile%" CALL :mazing_menu
 	IF ERRORLEVEL 2 EXIT /B !ERRORLEVEL!
 	SET /A "et=%%?+wide, pct=%%?*100/size"
-	TITLE Maze#!mazeCnt! ^| !title0! !pct!%% ^| %titleCS% %titleGK% ^| !title1! !TIME: =0!
+	TITLE Maze#!mazeCnt! ^| !title0! ^| !pct!%% ^| %titleCS% %titleGK% ^| !title1! !TIME: =0!
 	FOR /L %%@ IN (0,1,%wd%) DO (
 		SET /A "cp=%%?+%%@, ct=cp+1, nw=cp-wide, sw=cp+wide, ew=cp+1, ww=cp-1, list=-1"
 		FOR /F "tokens=1-6" %%A IN ("!nw! !sw! !ew! !ww! !cp! !ct!") DO IF "!mz:~%%E,1!" EQU "!wall!" (
@@ -1424,7 +1432,7 @@ FOR /L %%? IN (0,%wide%,%size%) DO IF %%? LSS %size% (
 		%EKO%!msg:~1!
 	)
 )
-TITLE Maze#!mazeCnt! ^| !title0! 100%% ^| %titleCS% %titleGK% ^| !title1! !TIME: =0!
+TITLE Maze#!mazeCnt! ^| !title0! ^| 100%% ^| %titleCS% %titleGK% ^| !title1! !TIME: =0!
 SET "mazeTop=!mz:~0,%wide%!  !labelTop!"
 SET "mazeTop=!mazeTop:~-%wide%!"
 SET "mazeTop=!mz:~0,2!!labelTop!!mazeTop!"
@@ -1533,7 +1541,7 @@ FOR /L %%? IN (1,1,64) DO IF !curPos! NEQ !endPos! FOR /L %%@ IN (1,1,64) DO IF 
 	IF !trail! GTR !far! SET /A far=trail
 	SET /A curPos=newPos
 	SET "list=!newList!"
-	TITLE Maze#!mazeCnt! ^| !title0! ^| !pct!%% n:!nCnt!/!nodes! ^| #!cnt! trail:!trail! ^| %titleCS% %titleGK% ^| !title1! !TIME: =0!
+	TITLE Maze#!mazeCnt! ^| !title0! ^| !pct!%% n:!nodes!/!nCnt! ^| #!cnt! trail:!trail! ^| %titleCS% %titleGK% ^| !title1! !TIME: =0!
 	IF !display! LSS 0 ( !clear!
 		ECHO(!mz!
 		%EKO%!msg:~1!
@@ -1592,7 +1600,7 @@ IF !display! NEQ 0 ( !clear!
 IF !display! GTR 0 CALL :mazing_BGcolor
 
 REM create stacks of cell positions for each row, omit start and end
-TITLE Maze#!mazeCnt! ^| !title0! sorting nodes, please wait...
+TITLE Maze#!mazeCnt! ^| !title0! sorting nodes, please wait... !TIME: =0!
 SET /A cp=np=t1=0, b1=bgnPos+1, e1=endPos+1
 FOR /L %%A IN (0,1,16) DO ( SET "np%%A=" ) & ( SET "wp%%A=" )
 REM dfMode straight sort
@@ -1665,7 +1673,7 @@ FOR /L %%@ IN (1,1,64) DO IF DEFINED t1 ( SET "t1="
 				%EKO%!msg:~1!
 			)
 		)
-		TITLE Maze#!mazeCnt! ^| !title0! ^| !pct!%% pass#%%@ loop#!cnt! ^| n:!nCnt!/!nodes!/n!np! ^| %titleCS% %titleGK% ^| !title1! !TIME: =0!
+		TITLE Maze#!mazeCnt! ^| !title0! ^| !pct!%% #!cnt! pass#%%@ ^| n:!nodes!/!nCnt!/n!np! ^| %titleCS% %titleGK% ^| !title1! !TIME: =0!
 	)
 )
 IF DEFINED t1 CALL :mazing_failure DeadFiller
@@ -1750,7 +1758,7 @@ FOR /L %%? IN (1,1,64) DO IF NOT DEFINED pf%endPos% FOR /L %%@ IN (1,1,64) DO IF
 				)
 			)
 		)
-		TITLE Maze#!mazeCnt! ^| !title0! ^| !pct!%% n:!nCnt!/!nodes! ^| #!cnt! trail:!trail! ^| %titleCS% %titleGK% ^| !title1! !TIME: =0!
+		TITLE Maze#!mazeCnt! ^| !title0! ^| !pct!%% n:!nodes!/!nCnt! ^| #!cnt! trail:!trail! ^| %titleCS% %titleGK% ^| !title1! !TIME: =0!
 	)
 	IF !display! LSS 0 ( !clear!
 		ECHO(!mz!
@@ -1885,7 +1893,7 @@ EXIT /B 0
 
 :mazing_init
 REM start with clean environment, nothing but the PATH
-TITLE %~n0 initializing, please wait...
+TITLE %~n0 initializing, please wait... !TIME: =0!
 (	FOR /F "tokens=1 delims==" %%A IN ('SET 2^>NUL') DO SET "%%A="
 	SET "PATH=%~dp0;%PATH%")
 

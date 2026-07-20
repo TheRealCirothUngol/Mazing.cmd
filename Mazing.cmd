@@ -99,7 +99,7 @@
 ::  If using Windows 10+ enable 'properties/legacy console'
 :: 
 :: 
-:: project by CirothUngol                  v0.3 July 18, 2026
+:: project by CirothUngol                  v0.3 July 19, 2026
 ::
 :: Added Prim's, Kruskal's, and Wilson's Algorithms as generators.
 :: Gave Wilson's lots of entry options, now it's one of the best!
@@ -329,7 +329,8 @@ IF !mzOp19! GEQ 0 SET "delay=!mzOp19!"
                   SET "display=!mzOp20!"
 
 REM if colorShift is unnecessary disable it by setting the target too high
-IF !csBtm!!csFtm!!pulse! EQU 0 (SET csTrg=2147483647& SET "titleCS=") ELSE (SET csTrg=0& SET "titleCS=cs:^!csTrg^!")
+IF !csBtm!!csFtm!!pulse! EQU 0 (SET "csTrg=2147483647"& SET "titleCS=") ELSE (SET "csTrg=0"& SET "titleCS=cs:^!csTrg^!")
+IF !display! EQU 0 (SET "csTrg=2147483647"& SET "titleCS=")
 
 REM generate BG.EXE if needed
 IF !display! GTR 0 ( BG.EXE >NUL 2>&1
@@ -347,7 +348,6 @@ REM.>"%keyFile%"
 IF NOT DEFINED bgKey (
 	START "" /B CMD /C ^""%~f0" grabKey "!quitKey!" "!keyFile!" 2^>NUL ^>NUL^" )
 IF !mOp! EQU 5 EXIT /B 2
-IF !display! EQU 0 (SET csTrg=2147483647& SET "titleCS=")
 IF !display! EQU 0 EXIT /B 0
 :: IF NOT DEFINED wide EXIT /B 0
 
@@ -462,6 +462,7 @@ FOR %%A IN (!RANDOM! 0 1 2) DO FOR %%B IN (!RANDOM! 0 1 2) DO ( SET /A mt0+=1
 
 REM if colorShift is unnecessary disable it by setting the target too high
 IF !csBtm!!csFtm!!pulse! EQU 0 (SET csTrg=2147483647& SET "titleCS=") ELSE (SET csTrg=0& SET "titleCS=cs:^!csTrg^!")
+IF !display! EQU 0 (SET "csTrg=2147483647"& SET "titleCS=")
 
 REM check for valid maze size
 SET /A "size=(cols*2+1)*(rows*2+1)"
@@ -481,11 +482,11 @@ IF !display! NEQ 0 (
 	MODE CON COLS=%wide% LINES=%modeHigh%
 	COLOR !bgClr!!fgClr!)
 
-REM maze selection bias 0-13: 0x1,1x3,2x3,3x2,4x2,5x1,6x1,7x1
+REM maze selection bias 0-13: 0x1,1x3,2x3,3x1,4x2,5x1,6x1,7x2
        IF !mzSelect! GEQ 12 (SET mzSelect=1
 ) ELSE IF !mzSelect! GEQ 10 (SET mzSelect=2
-) ELSE IF !mzSelect! GEQ 9 (SET mzSelect=3
-) ELSE IF !mzSelect! GEQ 8 SET mzSelect=4
+) ELSE IF !mzSelect! GEQ 9 (SET mzSelect=4
+) ELSE IF !mzSelect! GEQ 8 SET mzSelect=7
 REM solve selection bias 1-10: 1x3,2x2,3x5
        IF !svSelect! GEQ 9 (SET svSelect=1
 ) ELSE IF !svSelect! GEQ 8 (SET svSelect=2
@@ -1140,7 +1141,7 @@ FOR /L %%A IN (1,1,%rows%) DO (
 		SET "ka_!np!=!np!"
 	)
 )
-SET "BGstart=" & SET "FGstart=" & SET /A csCnt=csTrg=pCnt=0
+IF !display! NEQ 0 SET "BGstart=" & SET "FGstart=" & SET /A csCnt=csTrg=pCnt=0
 
 REM loop through #walls, select from V/H wallLists, uMerge positions, and carve new openings
 SET /A "numWalls=cols*rows*2-cols-rows-1,numNodes=cols*rows"
@@ -1209,7 +1210,7 @@ IF !uf1! NEQ !uf2! ...
 REM %1 number of additional entry points, maze=crumbs if negative
 REM %1 odd=reverse crumbs+halls in walk / don't show loop animation
 REM %1 mod3 0=crumb+hall / 1=all crumbs / 2=all halls
-REM %2 minumum length of 1st random walk from 1-10% numNodes, if %2=0 use addEntry
+REM %2 minumum length of 1st random walk from 1-11% numNodes, if %2=0 use addEntry
 REM %3=directional bias. 1=most vertical, 99=most horizontal
 SET /A "addEntry=%~1,lr=%~1%%2,uds=%~1%%3,vBias=100-%~3,hBias=%~3,numNodes=cols*rows,curPos=bt=bgnPos,waStop=minWalk=bgCnt=nCnt=pct=cnt=t1=t2=t3=0,rWalk=1,t4=wide-4,bt+=1"
 IF %~1 LSS 0  SET /A addEntry*=-1

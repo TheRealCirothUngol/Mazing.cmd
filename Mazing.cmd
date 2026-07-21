@@ -99,7 +99,7 @@
 ::  If using Windows 10+ enable 'properties/legacy console'
 :: 
 :: 
-:: project by CirothUngol                  v0.3 July 19, 2026
+:: project by CirothUngol                  v0.3 July 20, 2026
 ::
 :: Added Prim's, Kruskal's, and Wilson's Algorithms as generators.
 :: Gave Wilson's lots of entry options, now it's one of the best!
@@ -1846,7 +1846,7 @@ EXIT /B 0
 REM %1=place exit where?
 REM 0=farthest point, 1=farthest point on border, 2>=farthest corner
 SETLOCAL
-SET /A "cnt=trail=ep%bgnPos%=0"
+SET /A "cnt=trail=ep%bgnPos%=0,numNodes=cols*rows"
 SET "stack=!bgnPos! "
 IF %1 EQU 0 SET title0=Inside
 IF %1 EQU 1 SET title0=Border
@@ -1860,7 +1860,7 @@ IF %1 GTR 1 ( SET /A "endPos%1=wide+1, r1=bgnPos/wide, c1=bgnPos-r1*wide"
 	%colorShift%
 	FOR %%A IN (!stack!) DO ( SET "stack=!stack:* =!"   'remove opening spaces
 		%mazingDebug% SET>%~f0.debug.EndPos.txt
-		SET /A "cnt+=1, np=%%A-wide*2, sp=%%A+wide*2, ep=%%A+2, wp=%%A-2, nw=%%A-wide, sw=%%A+wide, ew=%%A+1, ww=%%A-1, wk=%%A/wide*wide, ek=wk+wide-1"
+		SET /A "cnt+=1, pct=cnt*100/numNodes, np=%%A-wide*2, sp=%%A+wide*2, ep=%%A+2, wp=%%A-2, nw=%%A-wide, sw=%%A+wide, ew=%%A+1, ww=%%A-1, wk=%%A/wide*wide, ek=wk+wide-1"
 		FOR %%B IN (n s e w) DO FOR /F "tokens=1-2" %%C IN ("!%%Bw! !%%Bp!") DO (
 			IF %%D LSS !wide! ( SET "endPos1=%%A"
 			) ELSE IF %%D GTR !size! ( SET "endPos1=%%A"

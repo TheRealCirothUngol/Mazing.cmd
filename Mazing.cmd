@@ -99,7 +99,7 @@
 ::  If using Windows 10+ enable 'properties/legacy console'
 :: 
 :: 
-:: project by CirothUngol                  v0.3 July 20, 2026
+:: project by CirothUngol                  v0.3 July 21, 2026
 ::
 :: Added Prim's, Kruskal's, and Wilson's Algorithms as generators.
 :: Gave Wilson's lots of entry options, now it's one of the best!
@@ -671,12 +671,12 @@ FOR /L %%? IN (1,1,64) DO IF !nCnt! LSS !nodes! FOR /L %%@ IN (1,1,64) DO IF !nC
 			SET /A "curPos=!tList:.=!"%=                           'remove dots and assure numeracy =%
 		) ELSE FOR %%A IN (!ch!) DO FOR /F "tokens=1 delims=. " %%B IN ("!stack:~%%A!") DO SET "curPos=%%B"
 	)%=       'or choose randomly using ch and separating newPosition by delimiting dots and spaces in the stack =%
-	SET /A "rCnt=rTmp=0, cnt+=1, cTmp=curPos+1, np=curPos-wide*2, sp=curPos+wide*2, ep=curPos+2, wp=curPos-2, wChk=curPos/wide*wide, eChk=wChk+wide, nw=curPos-wide, sw=curPos+wide, ew=curPos+1, ww=curPos-1"
+	SET /A "rCnt=rTmp=numD=0, cnt+=1, cTmp=curPos+1, np=curPos-wide*2, sp=curPos+wide*2, ep=curPos+2, wp=curPos-2, wChk=curPos/wide*wide, eChk=wChk+wide, nw=curPos-wide, sw=curPos+wide, ew=curPos+1, ww=curPos-1"
 	FOR /F "tokens=1-4" %%A IN ("!np! !sp! !ep! !wp!") DO (%= 'cnt=#of entries in stack, np/sp/ep/wp=north/south/east/west hallPosition, nw/sw/ew/ww=north/south/east/west wallPosition, wChk/eChk=east/west check for maze border =%
-		IF !np! GTR !wide! IF "!mz:~%%A,1!" EQU "!wall!" SET /A rCnt+=vBias & SET "rand=!nBias!!rand!"
-		IF !sp! LSS !size! IF "!mz:~%%B,1!" EQU "!wall!" SET /A rCnt+=vBias & SET "rand=!sBias!!rand!"
-		IF !ep! LSS !eChk! IF "!mz:~%%C,1!" EQU "!wall!" SET /A rCnt+=hBias & SET "rand=!eBias!!rand!"
-		IF !wp! GTR !wChk! IF "!mz:~%%D,1!" EQU "!wall!" SET /A rCnt+=hBias & SET "rand=!wBias!!rand!"
+		IF !np! GTR !wide! IF "!mz:~%%A,1!" EQU "!wall!" SET /A numD+=1,rCnt+=vBias & SET "rand=!nBias!!rand!"
+		IF !sp! LSS !size! IF "!mz:~%%B,1!" EQU "!wall!" SET /A numD+=1,rCnt+=vBias & SET "rand=!sBias!!rand!"
+		IF !ep! LSS !eChk! IF "!mz:~%%C,1!" EQU "!wall!" SET /A numD+=1,rCnt+=hBias & SET "rand=!eBias!!rand!"
+		IF !wp! GTR !wChk! IF "!mz:~%%D,1!" EQU "!wall!" SET /A numD+=1,rCnt+=hBias & SET "rand=!wBias!!rand!"
 	)%= 'build random selection list by including biasList for each direction that is within the maze borders and isn't already a hall =%
 	IF !rCnt! NEQ 0 (%= 'new adjacent unvisited cell available =%
 		SET /A "nCnt+=1, pct=nCnt*100/nodes, trail+=1, rChk=!RANDOM!%%rCnt"%= 'nCnt=nodeCount=#of nodes added to maze, trail=#of entries in stack, rChk=random entry in selection list =%
@@ -694,7 +694,7 @@ FOR /L %%? IN (1,1,64) DO IF !nCnt! LSS !nodes! FOR /L %%@ IN (1,1,64) DO IF !nC
 			)
 		)
 	)%= 'remove dead cell from the list =%
-	IF !rCnt! LSS 2 (%= 'rCnt<2 means either 0 or 1 directions available from currentPos, either way remove node from stack =%
+	IF !numD! LSS 2 (%= 'rCnt<2 means either 0 or 1 directions available from currentPos, either way remove node from stack =%
 		SET /A trail-=1
 		SET "cp=...!curPos!"%= 'reduce stack count, remove currentPosition from stack =%
 		FOR /F "tokens=1-3" %%A IN ("!curPos! !cTmp! !cp:~-4!") DO (
@@ -794,13 +794,13 @@ FOR /L %%? IN (1,1,64) DO IF !nCnt! LSS !nodes! FOR /L %%@ IN (1,1,64) DO IF !nC
 		IF %~2 GTR 100 IF !t1! EQU 0 SET "tList=!stack:~-5!"
 		SET /A "curPos=!tList:.=!"
 	) ELSE FOR %%A IN (!ch!) DO FOR /F "tokens=1 delims=. " %%B IN ("!stack:~%%A!") DO SET "curPos=%%B"
-	SET /A "rCnt=rTmp=0, cnt+=1, cTmp=curPos+1, np=curPos-wide*2, sp=curPos+wide*2, ep=curPos+2, wp=curPos-2, wChk=curPos/wide*wide, eChk=wChk+wide, nw=curPos-wide, sw=curPos+wide, ew=curPos+1, ww=curPos-1"
+	SET /A "rCnt=rTmp=numD=0, cnt+=1, cTmp=curPos+1, np=curPos-wide*2, sp=curPos+wide*2, ep=curPos+2, wp=curPos-2, wChk=curPos/wide*wide, eChk=wChk+wide, nw=curPos-wide, sw=curPos+wide, ew=curPos+1, ww=curPos-1"
 	REM examine NSEW, set highest stack position
 	FOR /F "tokens=1-4" %%A IN ("!np! !sp! !ep! !wp!") DO (
-		IF !np! GTR !wide! IF "!mz:~%%A,1!" EQU "!wall!" SET /A rCnt+=vBias & SET "rand=!nBias!!rand!"
-		IF !sp! LSS !size! IF "!mz:~%%B,1!" EQU "!wall!" SET /A rCnt+=vBias & SET "rand=!sBias!!rand!"
-		IF !ep! LSS !eChk! IF "!mz:~%%C,1!" EQU "!wall!" SET /A rCnt+=hBias & SET "rand=!eBias!!rand!"
-		IF !wp! GTR !wChk! IF "!mz:~%%D,1!" EQU "!wall!" SET /A rCnt+=hBias & SET "rand=!wBias!!rand!"
+		IF !np! GTR !wide! IF "!mz:~%%A,1!" EQU "!wall!" SET /A numD+=1,rCnt+=vBias & SET "rand=!nBias!!rand!"
+		IF !sp! LSS !size! IF "!mz:~%%B,1!" EQU "!wall!" SET /A numD+=1,rCnt+=vBias & SET "rand=!sBias!!rand!"
+		IF !ep! LSS !eChk! IF "!mz:~%%C,1!" EQU "!wall!" SET /A numD+=1,rCnt+=hBias & SET "rand=!eBias!!rand!"
+		IF !wp! GTR !wChk! IF "!mz:~%%D,1!" EQU "!wall!" SET /A numD+=1,rCnt+=hBias & SET "rand=!wBias!!rand!"
 	)
 	IF !rCnt! NEQ 0 ( REM adjacent unvisited cell available
 		REM choose RANDOM direction from list, set new cursor position, add to stack, and write to maze
@@ -819,7 +819,7 @@ FOR /L %%? IN (1,1,64) DO IF !nCnt! LSS !nodes! FOR /L %%@ IN (1,1,64) DO IF !nC
 			)
 		)
 	)
-	IF !rCnt! LSS 2 ( REM remove dead cell from the list
+	IF !numD! LSS 2 ( REM remove dead cell from the list
 		REM clear crumbs from maze, remove curPos from stack, and set new position
 		SET /A trail-=1
 		SET "cp=...!curPos!"
@@ -984,9 +984,8 @@ EXIT /B 0
 
 :mazing_ellers hvBias
 REM %1=directional bias. 0=most vertical, 99=most horizontal
-SET /A "mode=%~1%%20, curPos=bgnPos, b1=bgnPos+1, b2=bgnPos/(wide*2)+1, lbClr=sCnt=cnt=c1=0, nCnt=trail=far=1, cTmp=wide-4, vBias=100-%~1, hBias=%~1"
+SET /A "curPos=bgnPos, b1=bgnPos+1, b2=bgnPos/(wide*2)+1, lbClr=sCnt=cnt=c1=0, nCnt=trail=far=1, cTmp=wide-4, vBias=100-%~1, hBias=%~1"
 SET "fill=!hall!"
-IF !mode! EQU 0 SET "fill=!crumb!"
 IF "!wall!" EQU "ÿ" SET "fill=!crumb!"
 IF %~1 GTR 99 SET /A "vBias=1, hBias=99"
 IF %~1 LSS 1 SET /A "vBias=99, hBias=1"
@@ -1292,7 +1291,6 @@ REM build directional bias lists
 FOR %%A IN (n s e w) DO SET "%%ABias=%%A"%=                                  'start each list with a single character =%
 FOR /L %%A IN (2,1,!hBias!) DO SET "eBias=!eBias!e" & SET "wBias=!wBias!w"%= 'stack characters to represent percentage =%
 FOR /L %%A IN (2,1,!vBias!) DO SET "nBias=!nBias!n" & SET "sBias=!sBias!s"%= 'chance to select each direction =%
-
 FOR /L %%? IN (1,1,1024) DO IF DEFINED waStop FOR /L %%@ IN (1,1,1024) DO IF DEFINED waStop (
 	%mazingDebug% SET>%~f0.debug.Wilsons.txt
 	%BGgrabKey%
@@ -1301,7 +1299,7 @@ FOR /L %%? IN (1,1,1024) DO IF DEFINED waStop FOR /L %%@ IN (1,1,1024) DO IF DEF
 	IF !delay! GTR 0 CALL :mazing_wait !delay!
 	%colorShift%
 	IF !curPos! EQU 0 ( REM start new random walk
-		SET /A tr=!RANDOM!%%nCnt,nCnt-=1,rWalk=1,bgCnt=cnt+8
+		SET /A tr=!RANDOM!%%nCnt,nCnt-=1,rWalk=1,bgCnt=cnt+9
 		SET /A t1=t2=rn_!tr!,t3=rn_!tr!=rn_!nCnt!,t2+=1
 		SET "mz_!t3!=!tr!"
 		FOR %%A IN (!t1!) DO FOR %%B IN (!t2!) DO (
@@ -1314,7 +1312,6 @@ FOR /L %%? IN (1,1,1024) DO IF DEFINED waStop FOR /L %%@ IN (1,1,1024) DO IF DEF
 			)
 		)
 	)
-
 	REM calculate positions and build directional bias list
 	SET "rBias="
 	SET /A "np=curPos-wide*2,sp=curPos+wide*2,ep=curPos+2,wp=curPos-2,nw=curPos-wide,sw=curPos+wide,ew=curPos+1,ww=curPos-1,wChk=curPos/wide*wide,eChk=wChk+wide,rCnt=0,cnt+=1"
